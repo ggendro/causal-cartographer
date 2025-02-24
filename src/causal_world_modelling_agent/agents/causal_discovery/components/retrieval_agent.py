@@ -3,9 +3,9 @@ from typing import Optional, Dict
 
 from smolagents import Model
 
-from ...core.agent import CustomSystemPromptCodeAgent
-from ..factory import AgentFactory
-from ...tools.database import (
+from ....core.agent import CustomSystemPromptCodeAgent
+from ...factory import AgentFactory
+from ....tools.database import (
     SimpleJsonDatabase, 
     findEvent,
     listEvents,
@@ -23,8 +23,8 @@ from ...tools.database import (
     removeCausalRelationship,
     editCausalRelationship
 )
-from ...tools.wikifier import findCorrespondingWikiDataConcept
-from ...syntax.messages import EVENT, OBSERVED_VARIABLE, CAUSAL_RELATIONSHIP
+from ....tools.wikifier import findCorrespondingWikiDataConcept
+from ....syntax.messages import EVENT, OBSERVED_VARIABLE, CAUSAL_RELATIONSHIP
 
 
 

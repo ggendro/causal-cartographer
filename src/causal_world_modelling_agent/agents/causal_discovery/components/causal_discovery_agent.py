@@ -5,10 +5,10 @@ import networkx as nx
 
 from smolagents import Model
 
-from ...core.agent import CustomSystemPromptCodeAgent
-from ...core.definitions import Message
-from ...syntax.messages import OBSERVED_VARIABLE
-from ..factory import AgentFactory
+from ....core.agent import CustomSystemPromptCodeAgent
+from ....core.definitions import Message
+from ....syntax.messages import OBSERVED_VARIABLE
+from ...factory import AgentFactory
 
 
 

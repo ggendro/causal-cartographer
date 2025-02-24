@@ -1,10 +1,10 @@
 
 from smolagents import Model
 
-from ...core.agent import CustomSystemPromptCodeAgent
-from ..factory import AgentFactory
-from ...tools.causal_order import is_a_valid_partial_order
-from ...syntax.messages import OBSERVED_VARIABLE
+from ....core.agent import CustomSystemPromptCodeAgent
+from ...factory import AgentFactory
+from ....tools.causal_order import is_a_valid_partial_order
+from ....syntax.messages import OBSERVED_VARIABLE
 
 
 

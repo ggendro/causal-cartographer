@@ -3,9 +3,6 @@ from smolagents import Model
 
 from ...core.agent import CustomSystemPromptCodeAgent
 from ..factory import AgentFactory
-from .retrieval_agent import RetrievalAgentFactory
-from .causal_order_agent import CausalOrderAgentFactory
-from .causal_discovery_agent import CausalDiscoveryAgentFactory
 from ...syntax.messages import EVENT, OBSERVED_VARIABLE, VARIABLE, CAUSAL_RELATIONSHIP
 
 
