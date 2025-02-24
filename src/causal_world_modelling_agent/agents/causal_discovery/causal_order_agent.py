@@ -4,7 +4,7 @@ from smolagents import Model
 from ...core.agent import CustomSystemPromptCodeAgent
 from ..factory import AgentFactory
 from ...tools.causal_order import is_a_valid_partial_order
-from ...syntax.messages import VARIABLE
+from ...syntax.messages import OBSERVED_VARIABLE
 
 
 
@@ -21,9 +21,9 @@ class CausalOrderAgentFactory(AgentFactory):
                     ```
                     """
 
-    INTERNAL_SYSTEM_PROMPT = f"""You are an agent that builds a partial order fom a list of causal variables and verifies that the order is valid. The returned order should not create cycles and only use valid elements of the original list. 
+    SYSTEM_PROMPT = f"""You are an agent that builds a partial order fom a list of causal variables and verifies that the order is valid. The returned order should not create cycles and only use valid elements of the original list. 
                     The agent must use common sense knowledge to estimate the order of the causal variables. Variables are provided as an argument list with name 'causal_variables'. Causal variables have the following format:
-                    {VARIABLE}
+                    {OBSERVED_VARIABLE}
                     The agent must return a list of tuples, where each tuple corresponds to a pair of non-identical variable names that should be ordered. For example, if the list is [(a, b), (b, c)], it means that a < b < c.
                     Here an example:
                     ---
@@ -36,5 +36,5 @@ class CausalOrderAgentFactory(AgentFactory):
                     model=base_model, 
                     name="causal_order_agent", 
                     description=CausalOrderAgentFactory.DESCRIPTION.format(agent_name=CausalOrderAgentFactory.AGENT_NAME),
-                    custom_system_prompt=CausalOrderAgentFactory.INTERNAL_SYSTEM_PROMPT
+                    custom_system_prompt=CausalOrderAgentFactory.SYSTEM_PROMPT
             )

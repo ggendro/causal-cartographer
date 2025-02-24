@@ -24,7 +24,7 @@ from ...tools.database import (
     editCausalRelationship
 )
 from ...tools.wikifier import findCorrespondingWikiDataConcept
-from ...syntax.messages import EVENT, VARIABLE, CAUSAL_RELATIONSHIP
+from ...syntax.messages import EVENT, OBSERVED_VARIABLE, CAUSAL_RELATIONSHIP
 
 
 
@@ -70,7 +70,7 @@ class RetrievalAgentFactory(AgentFactory):
                     print(agent_answer) # 'I added the relationship to the database.' or 'The relationship was already in the database.'
                     """
 
-    INTERNAL_SYSTEM_PROMPT = f"""You are an agent that communicates with a database to store and retrieve events, variables and relationships.
+    SYSTEM_PROMPT = f"""You are an agent that communicates with a database to store and retrieve events, variables and relationships.
                     The database is provided as an argument with name 'database'.
                     The agent must add to the database any new event, variable or relationship that it is being sent.
                     The agent must not directly add variables to the database, instead, it must find the closest wikidata concept to the variable and add it to the database.
@@ -78,7 +78,7 @@ class RetrievalAgentFactory(AgentFactory):
                     Events have the following structure:
                     {EVENT}
                     Variables have the following structure:
-                    {VARIABLE}
+                    {OBSERVED_VARIABLE}
                     Causal Relationships have the following structure:
                     {CAUSAL_RELATIONSHIP}
                     """
@@ -106,6 +106,6 @@ class RetrievalAgentFactory(AgentFactory):
                     model=base_model,
                     name=RetrievalAgentFactory.AGENT_NAME,
                     description=RetrievalAgentFactory.DESCRIPTION.format(agent_name=RetrievalAgentFactory.AGENT_NAME),
-                    custom_system_prompt=RetrievalAgentFactory.INTERNAL_SYSTEM_PROMPT,
+                    custom_system_prompt=RetrievalAgentFactory.SYSTEM_PROMPT,
                     database=SimpleJsonDatabase()
         )

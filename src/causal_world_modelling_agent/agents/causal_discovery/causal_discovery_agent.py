@@ -7,7 +7,7 @@ from smolagents import Model
 
 from ...core.agent import CustomSystemPromptCodeAgent
 from ...core.definitions import Message
-from ...syntax.messages import VARIABLE
+from ...syntax.messages import OBSERVED_VARIABLE
 from ..factory import AgentFactory
 
 
@@ -43,9 +43,9 @@ class CausalDiscoveryAgentFactory(AgentFactory):
                     ```
                     """
 
-    INTERNAL_SYSTEM_PROMPT = f"""You are an agent that determines if a causal relationship exists between two causal variables. Variables are provided as arguments with names 'source_variable' and 'target_variable'.
+    SYSTEM_PROMPT = f"""You are an agent that determines if a causal relationship exists between two causal variables. Variables are provided as arguments with names 'source_variable' and 'target_variable'.
                     The agent must use common sense knowledge to estimate the causal relationship between the variables. Causal variables have the following format:
-                    {VARIABLE}
+                    {OBSERVED_VARIABLE}
                     The agent must return a single boolean value indicating if a causal relationship exists between the two variables as a final answer.
                     Example:
                     ```
@@ -64,5 +64,5 @@ class CausalDiscoveryAgentFactory(AgentFactory):
                     additional_authorized_imports=[],
                     name=CausalDiscoveryAgentFactory.AGENT_NAME, 
                     description=CausalDiscoveryAgentFactory.DESCRIPTION.format(agent_name=CausalDiscoveryAgentFactory.AGENT_NAME),
-                    custom_system_prompt="You are an " + CausalDiscoveryAgentFactory.INTERNAL_SYSTEM_PROMPT
+                    custom_system_prompt=CausalDiscoveryAgentFactory.SYSTEM_PROMPT
                 )

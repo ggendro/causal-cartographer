@@ -6,7 +6,7 @@ from ..factory import AgentFactory
 from .retrieval_agent import RetrievalAgentFactory
 from .causal_order_agent import CausalOrderAgentFactory
 from .causal_discovery_agent import CausalDiscoveryAgentFactory
-from ...syntax.messages import EVENT, VARIABLE, CAUSAL_RELATIONSHIP
+from ...syntax.messages import EVENT, OBSERVED_VARIABLE, VARIABLE, CAUSAL_RELATIONSHIP
 
 
 class AtomicDiscoveryAgentFactory(AgentFactory):
@@ -19,6 +19,8 @@ class AtomicDiscoveryAgentFactory(AgentFactory):
                     1. Retrieve the events in the text. Events have the following format:
                     {EVENT}
                     2. Retrieve the causal variables in the text associated with each event. Causal variables have the following format:
+                    {OBSERVED_VARIABLE}
+                    Some variables may be confounders that are not explicitely given in the text but affect the system. Estimate the confounders and add them to the list of causal variables. Their values are not directly available, therefore their expected format is as follows:
                     {VARIABLE}
                     3. Build a partial order from the list of causal variables. Use common sense knowledge to estimate the order of the causal variables and return a list of tuples, where each tuple corresponds to a pair of non-identical variable names that should be ordered.
                     4. Build the full causal graph as a networkx graph. The agent must be provided with the list of causal variables and will return a networkx DiGraph object. Causal relationships have the following format:

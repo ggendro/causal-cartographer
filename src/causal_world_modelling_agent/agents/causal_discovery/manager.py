@@ -6,17 +6,19 @@ from ..factory import AgentFactory
 from .retrieval_agent import RetrievalAgentFactory
 from .causal_order_agent import CausalOrderAgentFactory
 from .causal_discovery_agent import CausalDiscoveryAgentFactory
-from ...syntax.messages import EVENT, VARIABLE, CAUSAL_RELATIONSHIP
+from ...syntax.messages import EVENT, OBSERVED_VARIABLE, VARIABLE, CAUSAL_RELATIONSHIP
 
 
-class ManagerAgentFactory(AgentFactory):
+class CausalDiscoveryManagerAgentFactory(AgentFactory):
 
-    SYSTEM_PROMPT ="""Agent that manages other agents in the process of extracting a causal graph from a text snippet. The manager plan is as follows:
+    SYSTEM_PROMPT ="""You are an agent that manages other agents in the process of extracting a causal graph from a text snippet. The manager plan is as follows:
                     1. Retrieve the events in the text. Events have the following format:
                     {event}
                     2. Interact with the {retrieval_agent_name} agent to assess if the event is already in the database. If not, add it. If it is, retrieve and complete its information. 
                     Events may have been stored in the database with a different name. The {retrieval_agent_name} agent will find the closest match, which must be used.
                     3. Retrieve the causal variables in the text associated with each event. Harness the variable names retrieved from the events in the database to complete the list. Causal variables have the following format:
+                    {observed_variable}
+                    Some variables may be confounders that are not explicitely given in the text but affect the system. Estimate the confounders and add them to the list of causal variables. Their values are not directly available, therefore their expected format is as follows:
                     {variable}
                     4. Interact with the {retrieval_agent_name} agent to assess if the variable is already in the database. If it is, retrieve and complete its information. Particularly, use the name already existing in the database.
                     Variables may have been stored in the database with a different name. The {retrieval_agent_name} agent will find the closest match, which must be used.
@@ -77,8 +79,9 @@ class ManagerAgentFactory(AgentFactory):
         causal_order_agent = self.causal_order_agent_factory.createAgent(base_model)
         causal_discovery_agent = self.causal_discovery_agent_factory.createAgent(base_model)
 
-        system_prompt = ManagerAgentFactory.SYSTEM_PROMPT.format(
+        system_prompt = CausalDiscoveryManagerAgentFactory.SYSTEM_PROMPT.format(
             event=EVENT,
+            observed_variable=OBSERVED_VARIABLE,
             variable=VARIABLE,
             causalrelationship=CAUSAL_RELATIONSHIP,
             retrieval_agent_name=retrieval_agent.name,
@@ -92,6 +95,6 @@ class ManagerAgentFactory(AgentFactory):
                     # additional_authorized_imports=["networkx"],
                     name="causal_extraction_manager_agent", 
                     description=system_prompt,
-                    custom_system_prompt="You are an " + system_prompt,
+                    custom_system_prompt=system_prompt,
                     managed_agents=[retrieval_agent, causal_order_agent, causal_discovery_agent]
         )
