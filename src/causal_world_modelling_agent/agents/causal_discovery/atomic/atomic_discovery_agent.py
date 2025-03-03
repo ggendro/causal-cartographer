@@ -1,9 +1,9 @@
 
 from smolagents import Model
 
-from ...core.agent import CustomSystemPromptCodeAgent
-from ..factory import AgentFactory
-from ...syntax.messages import EVENT, OBSERVED_VARIABLE, VARIABLE, CAUSAL_RELATIONSHIP
+from ....core.agent import CustomSystemPromptCodeAgent
+from ...factory import AgentFactory
+from ....syntax.messages import EVENT, OBSERVED_VARIABLE, VARIABLE, CAUSAL_RELATIONSHIP
 
 
 class AtomicDiscoveryAgentFactory(AgentFactory):
@@ -55,6 +55,12 @@ class AtomicDiscoveryAgentFactory(AgentFactory):
 
                     # Step 4. Build the full causal graph as a networkx DiGraph and add the causal variables as nodes.
                     G = nx.DiGraph()
+
+                    # Add nodes with additional details representing the causal variables.
+                    for var in causal_variables:
+                        var_name = variable["name"]
+                        G.add_node(var_name)
+                        G.nodes[var_name].update(variable)
 
                     # Add edges with additional details representing the causal relationships.                                                                 
                     G.add_edge("...", "...", description="...", ...)
