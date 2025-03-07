@@ -16,19 +16,13 @@ class AtomicRAGDiscoveryAgent(CustomSystemPromptCodeAgent):
         retrieval_tool = self.tools["graph_retriever"]
         rag_task = task + retrieval_tool(task)
 
-        print(rag_task)
-
         return super().run(rag_task, *args, **kwargs)
 
 
 class AtomicRAGDiscoveryAgentFactory(AgentFactory):
     
-    def __init__(self, path_to_prompt_syntax: Optional[str] = None, graph_save_path: Optional[str] = None, initial_graph: Optional[nx.DiGraph] = None, depth: int = 2, max_documents: int = 3, api_key: Optional[str] = None):
-        if not path_to_prompt_syntax:
-            import os
-            path_to_prompt_syntax = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'syntax', 'prompts', 'rag_causal_discovery.yaml')
-        
-        super().__init__(path_to_prompt_syntax)
+    def __init__(self, path_to_prompt_syntax: str = 'rag_causal_discovery.yaml', use_prompt_lib_folder: bool = True, graph_save_path: Optional[str] = None, initial_graph: Optional[nx.DiGraph] = None, depth: int = 2, max_documents: int = 3, api_key: Optional[str] = None):
+        super().__init__(path_to_prompt_syntax, use_prompt_lib_folder)
 
         assert not (graph_save_path and initial_graph), "Either provide a graph save path or an initial graph, not both."
         
@@ -60,7 +54,7 @@ class AtomicRAGDiscoveryAgentFactory(AgentFactory):
             api_key=api_key
         )
 
-        system_prompt = self.system_prompt.format(
+        additional_system_prompt = self.additional_system_prompt.format(
             observed_variable=OBSERVED_VARIABLE,
             variable=VARIABLE,
             causal_relationship=CAUSAL_RELATIONSHIP,
@@ -71,7 +65,7 @@ class AtomicRAGDiscoveryAgentFactory(AgentFactory):
             tools=[self.retrieval_tool],
             model=base_model, 
             additional_authorized_imports=["networkx"],
-            name="rag_causal_extraction_agent", 
+            name=self.name, 
             description=self.description,
-            custom_system_prompt=system_prompt,
+            custom_system_prompt=additional_system_prompt,
         )

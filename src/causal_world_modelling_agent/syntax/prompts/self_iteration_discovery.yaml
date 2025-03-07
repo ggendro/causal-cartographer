@@ -64,3 +64,4 @@ description: |-
 user_pre_prompt: |-
   Build and expand a causal graph on the following subject:
   {topic}
+name: self_iterative_discovery_agent

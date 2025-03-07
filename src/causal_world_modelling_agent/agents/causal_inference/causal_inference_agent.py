@@ -6,6 +6,7 @@ from smolagents import Model
 
 from ..factory import AgentFactory
 from ...core.agent import CustomSystemPromptCodeAgent
+from ...core.definitions import Message
 
 
 class StepByStepCausalInferenceAgent(CustomSystemPromptCodeAgent):
@@ -15,7 +16,7 @@ class StepByStepCausalInferenceAgent(CustomSystemPromptCodeAgent):
         self.traversal_cutoff = traversal_cutoff
 
 
-    def _update_node_values_in_place(self, causal_graph: nx.DiGraph, updates: Dict[str, str], add_causal_effect: bool = True, reset_old_values: bool = False) -> None:
+    def _update_node_values_in_place(self, causal_graph: nx.DiGraph, updates: Message, add_causal_effect: bool = True, reset_old_values: bool = False) -> None:
         node_name = updates["name"]
 
         if reset_old_values:
@@ -31,7 +32,7 @@ class StepByStepCausalInferenceAgent(CustomSystemPromptCodeAgent):
             causal_graph.nodes[node_name]["causal_effect"] = updates["current_value"]
     
 
-    def _build_intervened_graph(self, causal_graph: nx.DiGraph, interventions: List[Dict[str, str]], structure_only: bool = False) -> nx.DiGraph:
+    def _build_intervened_graph(self, causal_graph: nx.DiGraph, interventions: List[Message], structure_only: bool = False) -> nx.DiGraph:
         intervened_graph = causal_graph.copy()
         for intervention in interventions:
             if not structure_only:
@@ -53,9 +54,9 @@ class StepByStepCausalInferenceAgent(CustomSystemPromptCodeAgent):
         return causal_paths
 
 
-    def _prune_graph(self, causal_graph: nx.DiGraph, target_variable: str, observations: List[Dict[str, str]], interventions: List[Dict[str, str]]) -> nx.DiGraph:
+    def _prune_graph(self, causal_graph: nx.DiGraph, target_variable: str, observations: List[Message], interventions: List[Message]) -> nx.DiGraph:
         intervened_graph = self._build_intervened_graph(causal_graph, interventions, structure_only=True)
-        intervened_graph.remove_edges_from(list(intervened_graph.out_edges(target_variable)))
+        intervened_graph.remove_edges_from(list(intervened_graph.out_edges(target_variable))) # key aspect: we compute the causal effect from parent knowledge only
 
         kept_nodes = set()
         conditioning_set = set([observation["name"] for observation in observations] + [intervention["name"] for intervention in interventions])
@@ -71,7 +72,7 @@ class StepByStepCausalInferenceAgent(CustomSystemPromptCodeAgent):
 
     def _estimate_causal_effect_in_place(self, causal_graph: nx.DiGraph, target_variable: str, run_args: Tuple, run_kwargs: Dict) -> None:
         if "causal_effect" not in causal_graph.nodes[target_variable]:
-            parents = list(causal_graph.predecessors(target_variable))
+            parents = list(causal_graph.predecessors(target_variable)) # key aspect: we compute the causal effect from parent knowledge only
             for parent in parents:
                 self._estimate_causal_effect_in_place(causal_graph, parent, run_args, run_kwargs)
                 
@@ -85,14 +86,14 @@ class StepByStepCausalInferenceAgent(CustomSystemPromptCodeAgent):
         return causal_graph.nodes[target_variable]["causal_effect"], causal_graph
     
 
-    def _compute_abductions(self, causal_graph: nx.DiGraph, observations: List[Dict[str, str]], interventions: List[Dict[str, str]], run_args: Tuple, run_kwargs: Dict) -> List[Dict[str, str]]:
+    def _compute_abductions(self, causal_graph: nx.DiGraph, observations: List[Message], interventions: List[Message], run_args: Tuple, run_kwargs: Dict) -> List[Message]:
         non_abduction_nodes = [observation["name"] for observation in observations] + [intervention["name"] for intervention in interventions]
         abduction_nodes = []
         for node in causal_graph.nodes:
             if causal_graph.in_degree(node) == 0 and node not in non_abduction_nodes:
                 abduction_nodes.append(node)
         
-        reverse_graph = causal_graph.reverse()
+        reverse_graph = causal_graph.reverse(copy=True)
 
         for observation in observations:
             self._update_node_values_in_place(reverse_graph, observation, add_causal_effect=True, reset_old_values=False)
@@ -105,7 +106,7 @@ class StepByStepCausalInferenceAgent(CustomSystemPromptCodeAgent):
         return abductions
     
 
-    def _run_counterfactual_query(self, causal_graph: nx.DiGraph, target_variable: str, observations: List[Dict[str, str]], interventions: List[Dict[str, str]], run_args: Tuple, run_kwargs: Dict) -> Tuple[str, nx.DiGraph]:
+    def _run_counterfactual_query(self, causal_graph: nx.DiGraph, target_variable: str, observations: List[Message], interventions: List[Message], run_args: Tuple, run_kwargs: Dict) -> Tuple[str, nx.DiGraph]:
         # Prune graph
         pruned_graph = self._prune_graph(causal_graph, target_variable, observations, interventions)
 
@@ -164,41 +165,16 @@ class StepByStepCausalInferenceAgent(CustomSystemPromptCodeAgent):
 
 class CausalInferenceAgentFactory(AgentFactory):
 
-    DESCRIPTION = """Agent that computes a causal inference query given a causal graph and observational, interventional and counterfactual data. All the additional arguments must be provided as a dictionary with the following keys 'causal_graph', 'target_variable', 'observations' and 'interventions'.
-                    The causal graph is provided as a networkx DiGraph. Observations are provided as a list of dictionaries corresponding to the observed variables and their values. Interventions are provided as a list of dictionaries with the intervened variables and their values.
-                    The agent returns a tuple with the causal effect as a string and the updated networkx causal graph.
-                    """
-    
-    SYSTEM_PROMPT = """You are an agent that computes the causal effect of a target causal variable given the values of its direct parents in the causal graph. The agent must use common sense knowledge to estimate the causal effect of the target variable.
-                    The attributes of the target variable are provided as arguments with the name 'target_variable'. The parent variables attributes are provided as a list of dictionaries with the name 'parent_variables'. The descriptions of the causal relationships between the target varibale and its parents are provided as a list of attribute dictionaries with the name 'causal_relationships'.
-                    The agent must return a dictionary with the updated attributes of the target variable. The fields to update are 'current_value', 'contextual_information' and 'causal_effect'.
-                    
-                    Example:
-                    ---
-                    Task: [USER_INPUT]
-
-                    Thought: Let's print out the variable attributes: 
-                    ```
-                    print("target variable:", target_variable)
-                    for i, parent_variable in enumerate(parent_variables):
-                        print(f"parent variable {i}: {parent_variable}")
-                    ```<end_code>
-                    Observation: The target variable is '...' and the parent variables are '...'. They are linked by the following causal relationships: '...'. By consequence, the causal effect is '...'.
-                    
-                    target_variable['current_value'] = '...'
-                    target_variable['contextual_information'] = '...'
-                    target_variable['causal_effect'] = '...'
-                    final_answer(target_variable)
-                    ```<end_code>
-                    """
+    def __init__(self, path_to_prompt_syntax: str = 'causal_inference.yaml', use_prompt_lib_folder: bool = True):
+        super().__init__(path_to_prompt_syntax, use_prompt_lib_folder)
 
     def createAgent(self, base_model: Model) -> StepByStepCausalInferenceAgent:
         return StepByStepCausalInferenceAgent(
                     tools=[],
                     model=base_model, 
                     additional_authorized_imports=[],
-                    name="causal_inference_agent", 
-                    description=CausalInferenceAgentFactory.DESCRIPTION,
-                    custom_system_prompt=CausalInferenceAgentFactory.SYSTEM_PROMPT,
+                    name=self.name, 
+                    description=self.description,
+                    custom_system_prompt=self.additional_system_prompt,
                     managed_agents=[]
         )

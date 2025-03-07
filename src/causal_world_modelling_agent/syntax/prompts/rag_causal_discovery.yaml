@@ -84,3 +84,4 @@ additional_system_prompt: |-
   ```<end_code>
 description: |-
   Agent that extracts a networkx causal graph from a text snippet.
+name: rag_causal_extraction_agent
