@@ -16,6 +16,7 @@ VARIABLE = \
     "description": <string>, # The description of the variable
     "type": <string>, # The type of the variable (boolean, integer, float, string, etc.)
     "values": <list>, # The set or range of possible values for the variable ([1, 2, 3], 'range(0,10)', ['low', 'medium', 'high'], 'True/False', 'natural numbers', etc.)
+    "supporting_text_snippets": <list>, # The supporting text snippets in which the variable is mentioned
 }"""
 
 OBSERVED_VARIABLE = \
@@ -24,6 +25,7 @@ OBSERVED_VARIABLE = \
     "description": <string>, # The description of the variable
     "type": <string>, # The type of the variable (boolean, integer, float, string, etc.)
     "values": <list>, # The set or range of possible values for the variable
+    "supporting_text_snippets": <list>, # The supporting text snippets in which the variable is mentioned
     "current_value": <string>, # The observed current value of the variable
     "contextual_information": <string>, # The contextual information associated with the current value of the variable
 }"""
