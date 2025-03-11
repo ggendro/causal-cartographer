@@ -1,5 +1,4 @@
 # pyproject.toml
 
 [tool.pytest.ini_options]
-# Add the 'src' directory to the Python path so that pytest can import your code
 pythonpath = ["src", "tests"]
