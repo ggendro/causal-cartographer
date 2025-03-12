@@ -33,11 +33,7 @@ def causal_variable_entropy(values: List[Message]) -> float:
 
     for i, value in enumerate(values):
         curr_value = value['current_value']
-
-        if curr_value in distribution:
-            distribution[curr_value] += 1
-        else:
-            distribution[curr_value] = 1
+        distribution[curr_value] = distribution.get(curr_value, 0) + 1
 
     entropy = 0.0
     total = sum(distribution.values())

@@ -4,6 +4,7 @@ import networkx as nx
 
 from smolagents import Model
 
+from ...utils.graph_utils import is_digraph
 from ..factory import AgentFactory
 from ...syntax.messages import OBSERVED_VARIABLE, VARIABLE, CAUSAL_RELATIONSHIP
 from ...tools.retrieval import GraphRetrieverTool
@@ -61,5 +62,6 @@ class AtomicRAGDiscoveryAgentFactory(AgentFactory[AtomicRAGDiscoveryAgent]):
                 'causal_relationship': CAUSAL_RELATIONSHIP,
                 'retrieval_tool_name': self.retrieval_tool.name
             },
+            final_answer_checks=[is_digraph],
             **kwargs
         )

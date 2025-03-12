@@ -1,7 +1,10 @@
 
+from ...utils.graph_utils import is_digraph
 from ..factory import AgentFactory
 from ...syntax.messages import EVENT, OBSERVED_VARIABLE, VARIABLE, CAUSAL_RELATIONSHIP
 from ..custom_prompt_agent import CustomPromptAgent
+
+
 
 
 class AtomicDiscoveryAgentFactory(AgentFactory[CustomPromptAgent]):
@@ -19,5 +22,6 @@ class AtomicDiscoveryAgentFactory(AgentFactory[CustomPromptAgent]):
                 'variable': VARIABLE,
                 'causal_relationship': CAUSAL_RELATIONSHIP
             },
+            final_answer_checks=[is_digraph],
             **kwargs
         )

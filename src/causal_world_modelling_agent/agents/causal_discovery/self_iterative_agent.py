@@ -5,6 +5,8 @@ from collections import deque
 
 from smolagents import Model
 
+
+from ...utils.graph_utils import is_digraph
 from ..factory import AgentFactory
 from ...syntax.messages import OBSERVED_VARIABLE, VARIABLE, CAUSAL_RELATIONSHIP
 from ..custom_prompt_agent import CustomPromptAgent
@@ -87,5 +89,6 @@ class SelfIterativeDiscoveryAgentFactory(AgentFactory[SelfIterativeDiscoveryAgen
                 'causal_relationship': CAUSAL_RELATIONSHIP,
                 'example_task': self.user_pre_prompt.format(topic='impact of exercise on mental health')
             },
+            final_answer_checks=[is_digraph],
             **kwargs
         )

@@ -44,6 +44,24 @@ final_answer("Dummy answer!")
         super().__init__(model_id="dummy_mock_model", source_code=self.SOURCE_CODE)
 
 
+class CreateGraphMockModel(MockModel):
+    """
+    Mock model for causal discovery testing. Creates a graph given the input message.
+    """
+    
+    SOURCE_CODE = """
+```
+import networkx as nx
+
+G = nx.DiGraph()
+final_answer(G)
+```<end_code>
+"""
+
+    def __init__(self):
+        super().__init__(model_id="create_graph_mock_model", source_code=self.SOURCE_CODE)
+
+
 class UpdateGraphMockModel(MockModel):
     """
     Mock model for causal discovery testing. Updates the graph given the input message.
