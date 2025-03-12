@@ -5,14 +5,13 @@ from collections import deque
 
 from smolagents import Model
 
-from ...core.definitions import Message
-from ...core.agent import CustomSystemPromptCodeAgent
 from ..factory import AgentFactory
 from ...syntax.messages import OBSERVED_VARIABLE, VARIABLE, CAUSAL_RELATIONSHIP
+from ..custom_prompt_agent import CustomPromptAgent
 
 
 
-class SelfIterativeDiscoveryAgent(CustomSystemPromptCodeAgent):
+class SelfIterativeDiscoveryAgent(CustomPromptAgent):
 
     def __init__(self, *args, pre_prompt: str, num_iterations: int = 1, initial_graph: Optional[nx.DiGraph] = None, previous_history: Optional[List[nx.DiGraph]] = None, **kwargs):
         assert num_iterations > 0, "The number of iterations must be greater than 0."
@@ -35,7 +34,6 @@ class SelfIterativeDiscoveryAgent(CustomSystemPromptCodeAgent):
         queue = deque([task])
 
         for _ in range(self.num_iterations):
-            print(f"Iteration {_ + 1} / {self.num_iterations}")
             if not queue:
                 break
 
@@ -52,10 +50,10 @@ class SelfIterativeDiscoveryAgent(CustomSystemPromptCodeAgent):
 
 
 
-class SelfIterativeDiscoveryAgentFactory(AgentFactory):
+class SelfIterativeDiscoveryAgentFactory(AgentFactory[SelfIterativeDiscoveryAgent]):
 
-    def __init__(self, path_to_prompt_syntax: str = 'self_iteration_discovery.yaml', use_prompt_lib_folder: bool = True, num_iterations: int = 1, graph_save_path: Optional[str] = None, initial_graph: Optional[nx.DiGraph] = None, previous_history: Optional[List[nx.DiGraph | str]] = None):
-        super().__init__(path_to_prompt_syntax, use_prompt_lib_folder)
+    def __init__(self, path_to_system_prompt: str = 'self_iteration_discovery.yaml', use_prompt_lib_folder: bool = True, num_iterations: int = 1, graph_save_path: Optional[str] = None, initial_graph: Optional[nx.DiGraph] = None, previous_history: Optional[List[nx.DiGraph | str]] = None):
+        super().__init__(SelfIterativeDiscoveryAgent, path_to_system_prompt, use_prompt_lib_folder)
         
         self.num_iterations = num_iterations
 
@@ -74,24 +72,20 @@ class SelfIterativeDiscoveryAgentFactory(AgentFactory):
         if self.previous_history and not self.initial_graph:
             self.initial_graph = self.previous_history[-1]
 
-        self.additional_system_prompt = self.additional_system_prompt.format(
-            observed_variable=OBSERVED_VARIABLE,
-            variable=VARIABLE,
-            causal_relationship=CAUSAL_RELATIONSHIP,
-            example_task=self.user_pre_prompt.format(topic='impact of exercise on mental health')
-        )
 
-
-    def createAgent(self, base_model: Model) -> SelfIterativeDiscoveryAgent:
-        return SelfIterativeDiscoveryAgent(
+    def createAgent(self, base_model: Model, *args, **kwargs) -> SelfIterativeDiscoveryAgent:
+        return super().createAgent(
+            *args,
+            base_model=base_model,
             pre_prompt=self.user_pre_prompt,
-            tools=[], 
-            model=base_model, 
-            additional_authorized_imports=["networkx"],
-            name=self.name, 
-            description=self.description,
-            custom_system_prompt=self.additional_system_prompt,
             num_iterations=self.num_iterations,
             initial_graph=self.initial_graph,
-            previous_history=self.previous_history
+            previous_history=self.previous_history,
+            additional_system_prompt_variables={
+                'observed_variable': OBSERVED_VARIABLE,
+                'variable': VARIABLE,
+                'causal_relationship': CAUSAL_RELATIONSHIP,
+                'example_task': self.user_pre_prompt.format(topic='impact of exercise on mental health')
+            },
+            **kwargs
         )

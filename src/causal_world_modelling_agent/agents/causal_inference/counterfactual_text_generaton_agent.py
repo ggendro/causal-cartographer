@@ -1,16 +1,14 @@
 
-from typing import Optional, Dict, Tuple, List
+from typing import Optional, Dict
 
-import networkx as nx
-from smolagents import Model
+from smolagents import CodeAgent
 
 from ..factory import AgentFactory
-from ...core.agent import CustomSystemPromptCodeAgent
 
 
 
 
-class CounterfactualTextGenerationAgent(CustomSystemPromptCodeAgent):
+class CounterfactualTextGenerationAgent(CodeAgent):
 
     def run(self, *args, additional_args: Optional[Dict] = None, **kwargs):
         if "causal_graph" not in additional_args:
@@ -27,18 +25,7 @@ class CounterfactualTextGenerationAgent(CustomSystemPromptCodeAgent):
 
 
 
-class CounterfactualTextGenerationAgentFactory(AgentFactory):
+class CounterfactualTextGenerationAgentFactory(AgentFactory[CounterfactualTextGenerationAgent]):
 
-    def __init__(self, path_to_prompt_syntax: str = 'counterfactual_text_generation.yaml', use_prompt_lib_folder: bool = True):
-        super().__init__(path_to_prompt_syntax, use_prompt_lib_folder)
-
-    def createAgent(self, base_model: Model) -> CounterfactualTextGenerationAgent:
-        return CounterfactualTextGenerationAgent(
-                    tools=[],
-                    model=base_model, 
-                    additional_authorized_imports=[],
-                    name=self.name, 
-                    description=self.description,
-                    custom_system_prompt=self.additional_system_prompt,
-                    managed_agents=[]
-        )
+    def __init__(self, path_to_system_prompt: str = 'counterfactual_text_generation.yaml', use_prompt_lib_folder: bool = True):
+        super().__init__(CounterfactualTextGenerationAgent, path_to_system_prompt, use_prompt_lib_folder)

@@ -4,13 +4,13 @@ import networkx as nx
 
 from smolagents import Model
 
-from ...core.agent import CustomSystemPromptCodeAgent
 from ..factory import AgentFactory
 from ...syntax.messages import OBSERVED_VARIABLE, VARIABLE, CAUSAL_RELATIONSHIP
 from ...tools.retrieval import GraphRetrieverTool
+from ..custom_prompt_agent import CustomPromptAgent
 
 
-class AtomicRAGDiscoveryAgent(CustomSystemPromptCodeAgent):
+class AtomicRAGDiscoveryAgent(CustomPromptAgent):
 
     def run(self, task: str, *args, **kwargs) -> nx.DiGraph:
         retrieval_tool = self.tools["graph_retriever"]
@@ -19,10 +19,10 @@ class AtomicRAGDiscoveryAgent(CustomSystemPromptCodeAgent):
         return super().run(rag_task, *args, **kwargs)
 
 
-class AtomicRAGDiscoveryAgentFactory(AgentFactory):
+class AtomicRAGDiscoveryAgentFactory(AgentFactory[AtomicRAGDiscoveryAgent]):
     
-    def __init__(self, path_to_prompt_syntax: str = 'rag_causal_discovery.yaml', use_prompt_lib_folder: bool = True, graph_save_path: Optional[str] = None, initial_graph: Optional[nx.DiGraph] = None, depth: int = 2, max_documents: int = 3, api_key: Optional[str] = None):
-        super().__init__(path_to_prompt_syntax, use_prompt_lib_folder)
+    def __init__(self, path_to_system_prompt: str = 'rag_causal_discovery.yaml', use_prompt_lib_folder: bool = True, graph_save_path: Optional[str] = None, initial_graph: Optional[nx.DiGraph] = None, depth: int = 2, max_documents: int = 3):
+        super().__init__(AtomicRAGDiscoveryAgent, path_to_system_prompt, use_prompt_lib_folder)
 
         assert not (graph_save_path and initial_graph), "Either provide a graph save path or an initial graph, not both."
         
@@ -30,18 +30,15 @@ class AtomicRAGDiscoveryAgentFactory(AgentFactory):
         self.initial_graph = initial_graph
         self.depth = depth
         self.max_documents = max_documents
-        self.api_key = api_key
         self.retrieval_tool = None
 
         if self.graph_save_path:
             self.initial_graph = nx.read_gml(self.graph_save_path)
 
 
-    def createAgent(self, base_model: Model) -> CustomSystemPromptCodeAgent:
+    def createAgent(self, base_model: Model, *args, api_key: Optional[str] = None, **kwargs) -> AtomicRAGDiscoveryAgent:
 
-        if self.api_key:
-            api_key = self.api_key
-        else:
+        if not api_key:
             try:
                 api_key = base_model.api_key
             except AttributeError:
@@ -54,18 +51,15 @@ class AtomicRAGDiscoveryAgentFactory(AgentFactory):
             api_key=api_key
         )
 
-        additional_system_prompt = self.additional_system_prompt.format(
-            observed_variable=OBSERVED_VARIABLE,
-            variable=VARIABLE,
-            causal_relationship=CAUSAL_RELATIONSHIP,
-            retrieval_tool_name=self.retrieval_tool.name
-        )
-
-        return AtomicRAGDiscoveryAgent(
+        return super().createAgent(
+            *args,
             tools=[self.retrieval_tool],
-            model=base_model, 
-            additional_authorized_imports=["networkx"],
-            name=self.name, 
-            description=self.description,
-            custom_system_prompt=additional_system_prompt,
+            base_model=base_model,
+            additional_system_prompt_variables={
+                'observed_variable': OBSERVED_VARIABLE,
+                'variable': VARIABLE,
+                'causal_relationship': CAUSAL_RELATIONSHIP,
+                'retrieval_tool_name': self.retrieval_tool.name
+            },
+            **kwargs
         )

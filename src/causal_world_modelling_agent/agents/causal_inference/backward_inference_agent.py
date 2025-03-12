@@ -2,11 +2,10 @@
 from typing import Optional, Dict, Tuple, List
 
 import networkx as nx
-from smolagents import Model
 
 from ..factory import AgentFactory
 from .causal_inference_agent import StepByStepCausalInferenceAgent
-from ...core.definitions import Message
+from ...syntax.definitions import Message
 
 
 class BackwardInferenceAgent(StepByStepCausalInferenceAgent):
@@ -89,15 +88,7 @@ class BackwardInferenceAgent(StepByStepCausalInferenceAgent):
 
 
 
-class BackwardInferenceAgentFactory(AgentFactory):
-
-    def createAgent(self, base_model: Model) -> BackwardInferenceAgent:
-        return BackwardInferenceAgent(
-                    tools=[],
-                    model=base_model, 
-                    additional_authorized_imports=[],
-                    name=self.name, 
-                    description=self.description,
-                    custom_system_prompt=self.additional_system_prompt,
-                    managed_agents=[]
-        )
+class BackwardInferenceAgentFactory(AgentFactory[BackwardInferenceAgent]):
+    
+    def __init__(self, path_to_system_prompt: str = 'causal_inference.yaml', use_prompt_lib_folder: bool = True):
+        super().__init__(BackwardInferenceAgent, path_to_system_prompt, use_prompt_lib_folder)

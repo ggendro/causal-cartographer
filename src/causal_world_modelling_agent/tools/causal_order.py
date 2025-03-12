@@ -4,7 +4,7 @@ import networkx as nx
 
 from smolagents import tool
 
-from ..core.definitions import Message
+from ..syntax.definitions import Message
 
 
 

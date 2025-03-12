@@ -3,7 +3,7 @@ from typing import Optional
 import requests
 
 from smolagents import tool
-from ..core.definitions import Message
+from ..syntax.definitions import Message
 
 @tool
 def findCorrespondingWikiDataConcept(variable_name: str) -> Optional[Message]:

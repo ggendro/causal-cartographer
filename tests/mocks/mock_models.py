@@ -1,8 +1,7 @@
 
 from typing import List, Dict, Optional
 
-from smolagents import ChatMessage, Model, Tool, CodeAgent
-from smolagents.models import ChatMessageToolCall
+from smolagents import ChatMessage, Model, Tool
 
 
 
@@ -30,6 +29,38 @@ class MockModel(Model):
         )
     
 
+
+class DummyMockModel(MockModel):
+    """
+    Mock model for testing purposes. Returns a dummy source code.
+    """
+    SOURCE_CODE = """
+```
+final_answer("Dummy answer!")
+```<end_code>
+"""
+
+    def __init__(self):
+        super().__init__(model_id="dummy_mock_model", source_code=self.SOURCE_CODE)
+
+
+class UpdateGraphMockModel(MockModel):
+    """
+    Mock model for causal discovery testing. Updates the graph given the input message.
+    Assumes that the graph is accessible as a parameter `G`.
+    """
+
+    SOURCE_CODE = """
+```
+G.add_node("node1")
+G.add_node("node2")
+G.add_edge("node1", "node2")
+final_answer(G)
+```<end_code>
+"""
+
+    def __init__(self):
+        super().__init__(model_id="update_graph_mock_model", source_code=self.SOURCE_CODE)
 
 
 class CountInferenceMockModel(MockModel):

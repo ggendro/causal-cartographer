@@ -7,6 +7,7 @@ from smolagents import Tool
 from langchain_core.vectorstores import InMemoryVectorStore # TODO: switch to more advanced vector databases for handling larger graphs, see https://python.langchain.com/docs/concepts/vectorstores/
 from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
+from langchain_core.embeddings import Embeddings
 
 
 class GraphRetrieverTool(Tool): # from https://huggingface.co/docs/smolagents/examples/rag and https://python.langchain.com/docs/integrations/retrievers/graph_rag/
@@ -20,12 +21,15 @@ class GraphRetrieverTool(Tool): # from https://huggingface.co/docs/smolagents/ex
     }
     output_type = "string"
 
-    def __init__(self, graph: Optional[nx.DiGraph] = None, depth: int = 2, max_documents: int = 3, api_key: Optional[str] = None, **kwargs):
+    def __init__(self, graph: Optional[nx.DiGraph] = None, depth: int = 2, max_documents: int = 3, api_key: Optional[str] = None, embeddings: Optional[Embeddings] = None, **kwargs):
         super().__init__(**kwargs)
         self.depth = depth
         self.max_documents = max_documents
 
-        self.retriever = InMemoryVectorStore(OpenAIEmbeddings(api_key=api_key)).as_retriever(k=max_documents)
+        if not embeddings:
+            embeddings = OpenAIEmbeddings(api_key=api_key)
+
+        self.retriever = InMemoryVectorStore(embeddings).as_retriever()
         self.graph = nx.DiGraph()
 
         if graph:
@@ -49,7 +53,7 @@ class GraphRetrieverTool(Tool): # from https://huggingface.co/docs/smolagents/ex
         
 
     def forward(self, query: str) -> str:
-        docs = self.retriever.invoke(query)
+        docs = self.retriever.invoke(query, k=self.max_documents)
 
         nodes, edges = {}, {}
         queue = deque([(doc.id, self.depth) for doc in docs])
@@ -62,6 +66,12 @@ class GraphRetrieverTool(Tool): # from https://huggingface.co/docs/smolagents/ex
             if depth > 0:
                 for neighbor in self.graph.neighbors(node):
                     edges[(node, neighbor)] = self.graph.edges[(node, neighbor)]
+
+                    if neighbor not in nodes:
+                        queue.append((neighbor, depth - 1))
+
+                for neighbor in self.graph.predecessors(node):
+                    edges[(neighbor, node)] = self.graph.edges[(neighbor, node)]
 
                     if neighbor not in nodes:
                         queue.append((neighbor, depth - 1))

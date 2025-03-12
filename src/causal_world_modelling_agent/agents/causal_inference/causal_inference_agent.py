@@ -2,14 +2,13 @@
 from typing import Optional, Dict, Tuple, List
 
 import networkx as nx
-from smolagents import Model
+from smolagents import CodeAgent
 
 from ..factory import AgentFactory
-from ...core.agent import CustomSystemPromptCodeAgent
-from ...core.definitions import Message
+from ...syntax.definitions import Message
 
 
-class StepByStepCausalInferenceAgent(CustomSystemPromptCodeAgent):
+class StepByStepCausalInferenceAgent(CodeAgent):
 
     def __init__(self, *args, traversal_cutoff: Optional[int] = None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -232,18 +231,7 @@ class StepByStepCausalInferenceAgent(CustomSystemPromptCodeAgent):
 
 
 
-class CausalInferenceAgentFactory(AgentFactory):
+class CausalInferenceAgentFactory(AgentFactory[StepByStepCausalInferenceAgent]):
 
-    def __init__(self, path_to_prompt_syntax: str = 'causal_inference.yaml', use_prompt_lib_folder: bool = True):
-        super().__init__(path_to_prompt_syntax, use_prompt_lib_folder)
-
-    def createAgent(self, base_model: Model) -> StepByStepCausalInferenceAgent:
-        return StepByStepCausalInferenceAgent(
-                    tools=[],
-                    model=base_model, 
-                    additional_authorized_imports=[],
-                    name=self.name, 
-                    description=self.description,
-                    custom_system_prompt=self.additional_system_prompt,
-                    managed_agents=[]
-        )
+    def __init__(self, path_to_system_prompt: str = 'causal_inference.yaml', use_prompt_lib_folder: bool = True):
+        super().__init__(StepByStepCausalInferenceAgent, path_to_system_prompt, use_prompt_lib_folder)
