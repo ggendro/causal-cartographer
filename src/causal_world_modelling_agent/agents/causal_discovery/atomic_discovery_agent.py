@@ -1,7 +1,8 @@
 
-from ...utils.graph_utils import is_digraph
+from ...utils.graph_utils import isDigraph
+from ...utils.message_utils import isGraphMessageDefinition
 from ..factory import AgentFactory
-from ...syntax.messages import EVENT, OBSERVED_VARIABLE, VARIABLE, CAUSAL_RELATIONSHIP
+from ...syntax.definitions import EventDefinition, ObservedVariableDefinition, VariableDefinition, CausalRelationshipDefinition
 from ..custom_prompt_agent import CustomPromptAgent
 
 
@@ -17,11 +18,11 @@ class AtomicDiscoveryAgentFactory(AgentFactory[CustomPromptAgent]):
             base_model,
             *args,
             additional_system_prompt_variables={
-                'event': EVENT,
-                'observed_variable': OBSERVED_VARIABLE,
-                'variable': VARIABLE,
-                'causal_relationship': CAUSAL_RELATIONSHIP
+                'event': EventDefinition.get_definition(),
+                'observed_variable': ObservedVariableDefinition.get_definition(),
+                'variable': VariableDefinition.get_definition(),
+                'causal_relationship': CausalRelationshipDefinition.get_definition()
             },
-            final_answer_checks=[is_digraph],
+            final_answer_checks=[isDigraph, isGraphMessageDefinition],
             **kwargs
         )

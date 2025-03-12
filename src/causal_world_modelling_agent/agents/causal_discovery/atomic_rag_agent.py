@@ -4,9 +4,10 @@ import networkx as nx
 
 from smolagents import Model
 
-from ...utils.graph_utils import is_digraph
+from ...utils.graph_utils import isDigraph
+from ...utils.message_utils import isGraphMessageDefinition
 from ..factory import AgentFactory
-from ...syntax.messages import OBSERVED_VARIABLE, VARIABLE, CAUSAL_RELATIONSHIP
+from ...syntax.definitions import ObservedVariableDefinition, VariableDefinition, CausalRelationshipDefinition
 from ...tools.retrieval import GraphRetrieverTool
 from ..custom_prompt_agent import CustomPromptAgent
 
@@ -57,11 +58,11 @@ class AtomicRAGDiscoveryAgentFactory(AgentFactory[AtomicRAGDiscoveryAgent]):
             tools=[self.retrieval_tool],
             base_model=base_model,
             additional_system_prompt_variables={
-                'observed_variable': OBSERVED_VARIABLE,
-                'variable': VARIABLE,
-                'causal_relationship': CAUSAL_RELATIONSHIP,
+                'observed_variable': ObservedVariableDefinition.get_definition(),
+                'variable': VariableDefinition.get_definition(),
+                'causal_relationship': CausalRelationshipDefinition.get_definition(),
                 'retrieval_tool_name': self.retrieval_tool.name
             },
-            final_answer_checks=[is_digraph],
+            final_answer_checks=[isDigraph, isGraphMessageDefinition],
             **kwargs
         )
