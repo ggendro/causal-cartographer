@@ -1,6 +1,6 @@
 
 import networkx as nx
-from typing import Dict
+from typing import Dict, List, Any
 
 from ..syntax.definitions import MessageDefinition, VariableDefinition, CausalRelationshipDefinition
 
@@ -9,22 +9,21 @@ def isMessageDefinition(data: Dict, definition: MessageDefinition) -> bool:
     try:
         definition.from_dict(data)
         return True
-    except TypeError:
-        return False
+    except TypeError as e: # TODO: modify excpetion logging to be more informative
+        raise e
     
-def isVariableDefinition(data: Dict) -> bool:
-    return isMessageDefinition(data, VariableDefinition)
+def isVariableDefinition(answer: Dict, memory: List[Any]) -> bool:
+    return isMessageDefinition(answer, VariableDefinition)
 
-def isCausalRelationshipDefinition(data: Dict) -> bool:
-    return isMessageDefinition(data, CausalRelationshipDefinition)
+def isCausalRelationshipDefinition(answer: dict, memory: List[Any]) -> bool:
+    return isMessageDefinition(answer, CausalRelationshipDefinition)
     
 
-def isGraphMessageDefinition(graph: nx.DiGraph) -> bool:
+def isGraphMessageDefinition(graph: nx.DiGraph, memory: List[Any]) -> bool:
     for node in graph.nodes:
-        if not isMessageDefinition(graph.nodes[node], VariableDefinition):
-            return False
-        
+        isMessageDefinition(graph.nodes[node], VariableDefinition)
+    
     for edge in graph.edges:
-        if not isMessageDefinition(graph.edges[edge], CausalRelationshipDefinition):
-            return False
+        isMessageDefinition(graph.edges[edge], CausalRelationshipDefinition)
+    return True
     
