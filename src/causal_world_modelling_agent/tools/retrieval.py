@@ -77,16 +77,16 @@ class GraphRetrieverTool(Tool): # from https://huggingface.co/docs/smolagents/ex
                         queue.append((neighbor, depth - 1))
 
 
-        return "\nRetrieved nodes:\n" + "".join(
-            [
-                f"{node}: {attrs.get('description', '')}\n"
-                for node, attrs in nodes.items()
-            ] + [
-                f"\nRetrieved edges:\n" + "".join(
-                    [
-                        f"{edge[0]} -> {edge[1]}: {attrs.get('description', '')}\n"
-                        for edge, attrs in edges.items()
-                    ]
-                )
-            ]
-        )
+        str_nodes = "Retrieved nodes:\n"
+        if len(nodes) > 0:
+            str_nodes += "\n".join([f"{node}: {attrs.get('description', '')}" for node, attrs in nodes.items()])
+        else:
+            str_nodes += "<empty>"
+
+        str_edges = "Retrieved edges:\n"
+        if len(edges) > 0:
+            str_edges += "\n".join([f"{edge[0]} -> {edge[1]}: {attrs.get('description', '')}" for edge, attrs in edges.items()])
+        else:
+            str_edges += "<empty>"
+
+        return f"{str_nodes}\n\n{str_edges}"

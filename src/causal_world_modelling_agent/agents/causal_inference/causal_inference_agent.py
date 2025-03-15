@@ -2,13 +2,14 @@
 from typing import Optional, Dict, Tuple, List
 
 import networkx as nx
-from smolagents import CodeAgent
 
 from ..factory import AgentFactory
-from ...syntax.definitions import Message
+from ..custom_prompt_agent import CustomPromptAgent
+from ...syntax.definitions import Message, InferredVariableDefinition, CausalRelationshipDefinition
+from ...utils.message_utils import isInferredVariableDefinition
 
 
-class StepByStepCausalInferenceAgent(CodeAgent):
+class StepByStepCausalInferenceAgent(CustomPromptAgent):
 
     def __init__(self, *args, traversal_cutoff: Optional[int] = None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -111,7 +112,7 @@ class StepByStepCausalInferenceAgent(CodeAgent):
             else:
                 parent_name = 'children_variables'
                 
-            updated_variable = super().run(*run_args, additional_args={parent_name: [causal_graph.nodes[parent] for parent in parents], 'target_variable': causal_graph.nodes[target_variable], 'causal_relationships': causal_graph.in_edges(target_variable, data=True)}, **run_kwargs)
+            updated_variable = super().run(*run_args, additional_args={parent_name: [causal_graph.nodes[parent] for parent in parents], 'target_variable': causal_graph.nodes[target_variable], 'causal_relationships': list(causal_graph.in_edges(target_variable, data=True))}, **run_kwargs)
             self._reset_state()
             self._update_node_values_in_place(causal_graph, updated_variable)
 
@@ -233,5 +234,16 @@ class StepByStepCausalInferenceAgent(CodeAgent):
 
 class CausalInferenceAgentFactory(AgentFactory[StepByStepCausalInferenceAgent]):
 
-    def __init__(self, path_to_system_prompt: str = 'causal_inference.yaml', use_prompt_lib_folder: bool = True):
+    def __init__(self, path_to_system_prompt: str = 'causal_inference_truncated.yaml', use_prompt_lib_folder: bool = True):
         super().__init__(StepByStepCausalInferenceAgent, path_to_system_prompt, use_prompt_lib_folder)
+
+    def createAgent(self, *args, **kwargs) -> StepByStepCausalInferenceAgent:
+        return super().createAgent(
+            *args,
+            additional_system_prompt_variables={
+                'variable': InferredVariableDefinition.get_definition(),
+                'causal_relationship': CausalRelationshipDefinition.get_definition()
+            },
+            final_answer_checks=[isInferredVariableDefinition],
+            **kwargs
+        )

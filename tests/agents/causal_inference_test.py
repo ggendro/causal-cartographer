@@ -12,6 +12,12 @@ class TestCausalInferenceAgent:
 
     @pytest.fixture
     def causal_inference_agent(self):
+        agent = CausalInferenceAgentFactory().createAgent(CountInferenceMockModel())
+        agent.final_answer_checks = []
+        return agent
+    
+    @pytest.fixture
+    def causal_inference_agent_with_checks(self):
         return CausalInferenceAgentFactory().createAgent(CountInferenceMockModel())
     
     @pytest.fixture
@@ -75,6 +81,82 @@ class TestCausalInferenceAgent:
         graph.add_edge('B', 'A')
         graph.add_edge('B', 'C')
         return graph
+    
+    @pytest.fixture
+    def causal_graph_full_features(self):
+        graph = nx.DiGraph()
+        graph.add_nodes_from([
+            ("Price of Oranges", {
+            "name": "Price of Oranges",
+            "description": "The price of oranges in the market, which is influenced by supply and demand.",
+            "type": "float",
+            "values": "range(0, 10)",
+            "causal_effect": "The price of oranges depends on the quantity demanded and quantity supplied in the market.",
+            "current_value": "2.50",
+            "contextual_information": "The current price of oranges is $2.50 per kilogram, based on current market conditions."
+            }),
+            ("Quantity Demanded", {
+            "name": "Quantity Demanded",
+            "description": "The total number of kilograms of oranges that consumers want to buy at a given price.",
+            "type": "integer",
+            "values": "range(0, 1000)",
+            "causal_effect": "The quantity demanded generally increases as the price decreases, according to the law of demand.",
+            "current_value": "600",
+            "contextual_information": "At the observed price of $2.50 per kilogram, consumers demand 600 kilograms of oranges."
+            }),
+            ("Quantity Supplied", {
+            "name": "Quantity Supplied",
+            "description": "The total number of kilograms of oranges that producers are willing to sell at a given price.",
+            "type": "integer",
+            "values": "range(0, 1000)",
+            "causal_effect": "The quantity supplied generally increases as the price increases, according to the law of supply.",
+            "current_value": "500",
+            "contextual_information": "At the observed price of $2.50 per kilogram, producers are willing to supply 500 kilograms of oranges."
+            }),
+            ("Market Constant", {
+            "name": "Market Constant",
+            "description": "A constant factor that adjusts the relationship between supply, demand, and price in the market.",
+            "type": "float",
+            "values": "[1.0, 1.5, 2.0]",
+            "causal_effect": "The market constant adjusts how supply and demand influence the final price of oranges.",
+            "current_value": "1.2",
+            "contextual_information": "The market constant is set to 1.2, based on the current market conditions for oranges."
+            })
+        ])
+        graph.add_edges_from([
+            ("Quantity Demanded", "Price of Oranges", {
+                "cause": "Quantity Demanded",
+                "effect": "Price of Oranges",
+                "description": "The price of oranges is influenced by the quantity demanded and the quantity supplied in the market. As demand increases, price tends to rise, and as demand decreases, price tends to fall.",
+                "contextual_information": "With 600 kilograms of oranges demanded at the current price of $2.50, the price is expected to change if the demand increases or decreases.",
+                "type": "direct",
+                "strength": "high",
+                "confidence": "high",
+                "function": "lambda market_constant, demand, supply: (market_constant * demand) / supply if supply != 0 else float('inf')"
+            }),
+            ("Quantity Supplied", "Price of Oranges", {
+                "cause": "Quantity Supplied",
+                "effect": "Price of Oranges",
+                "description": "The price of oranges is influenced by the quantity supplied. If supply exceeds demand, prices tend to fall, and if supply falls short of demand, prices tend to rise.",
+                "contextual_information": "Currently, the supply is lower than demand (500 kilograms supplied vs. 600 kilograms demanded), suggesting upward pressure on the price.",
+                "type": "direct",
+                "strength": "high",
+                "confidence": "high",
+                "function": "lambda market_constant, demand, supply: (market_constant * demand) / supply if supply != 0 else float('inf')"
+            }),
+            ("Market Constant", "Price of Oranges", {
+                "cause": "Market Constant",
+                "effect": "Price of Oranges",
+                "description": "The market constant adjusts the relationship between supply, demand, and price in the market. A higher constant leads to higher prices, while a lower constant leads to lower prices.",
+                "contextual_information": "With a market constant of 1.2, the price of oranges is expected to be 1.2 times the ratio of demand to supply.",
+                "type": "direct",
+                "strength": "moderate",
+                "confidence": "medium",
+                "function": "lambda market_constant, demand, supply: (market_constant * demand) / supply if supply != 0 else float('inf')"
+            })
+        ])
+        return graph
+
     
     def test_run_1_no_observations(self, causal_inference_agent, causal_graph_1):
         answer_text, answer_graph = causal_inference_agent.run("Hello world!", additional_args={'causal_graph': causal_graph_1, 'target_variable': 'B'})
@@ -316,3 +398,22 @@ class TestCausalInferenceAgent:
         assert 'A' not in answer_graph.nodes
         assert 'B' not in answer_graph.nodes
         assert answer_graph.nodes['C']['causal_effect'] == 1
+
+    def test_run_with_features_and_checks(self, causal_inference_agent_with_checks, causal_graph_full_features):
+        print(causal_graph_full_features.nodes(data=True))
+        answer_text, answer_graph = causal_inference_agent_with_checks.run("Hello world!", 
+                                                                           additional_args={
+                                                                               'causal_graph': causal_graph_full_features, 
+                                                                               'target_variable': 'Price of Oranges',
+                                                                                 'observations': [
+                                                                                      {'name': 'Quantity Demanded', 'current_value': 600},
+                                                                                      {'name': 'Quantity Supplied', 'current_value': 500},
+                                                                                      {'name': 'Market Constant', 'current_value': 1.2}
+                                                                                 ]
+                                                                               })
+        
+        assert answer_text == 1102.2
+        assert answer_graph.nodes['Price of Oranges']['causal_effect'] == 1102.2
+        assert answer_graph.nodes['Quantity Demanded']['causal_effect'] == 600
+        assert answer_graph.nodes['Quantity Supplied']['causal_effect'] == 500
+        assert answer_graph.nodes['Market Constant']['causal_effect'] == 1.2

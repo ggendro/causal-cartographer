@@ -1,7 +1,7 @@
 
 import pytest
 
-from causal_world_modelling_agent.syntax.definitions import EventDefinition, VariableDefinition, ObservedVariableDefinition, CausalRelationshipDefinition
+from causal_world_modelling_agent.syntax.definitions import EventDefinition, VariableDefinition, CausalRelationshipDefinition
 
 
 class TestEventDefinition:
@@ -86,11 +86,12 @@ class TestCausalReationshipDefinition:
 
     def test_from_dict_with_missing_keys(self):
         causal_relationship_dict = {
-            "cause": "cause_name",
-            "effect": "effect_name",
             "description": "causal_relationship_description",
             "contextual_information": "contextual_information",
             "type": "causal_relationship_type",
+            "strength": "causal_relationship_strength",
+            "confidence": "causal_relationship_confidence",
+            "function": "causal_relationship_function"
         }
         pytest.raises(TypeError, CausalRelationshipDefinition.from_dict, causal_relationship_dict)
 

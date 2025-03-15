@@ -23,7 +23,7 @@ class TestDiscoveryAgent:
         return agent
     
     def test_prompt_templates(self, discovery_agent):
-        assert discovery_agent.prompt_templates['system_prompt'].startswith("You are an agent that extracts a networkx causal graph from a text snippet.")
+        assert discovery_agent.prompt_templates['system_prompt'].startswith("You are an expert assistant who can solve any task using code blobs.")
     
     def test_run(self, discovery_agent):
         assert discovery_agent.run("Hello world!") == "Dummy answer!"

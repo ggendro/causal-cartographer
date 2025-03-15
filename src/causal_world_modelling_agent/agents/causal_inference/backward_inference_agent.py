@@ -5,7 +5,8 @@ import networkx as nx
 
 from ..factory import AgentFactory
 from .causal_inference_agent import StepByStepCausalInferenceAgent
-from ...syntax.definitions import Message
+from ...syntax.definitions import Message, InferredVariableDefinition, CausalRelationshipDefinition
+from ...utils.message_utils import isInferredVariableDefinition
 
 
 class BackwardInferenceAgent(StepByStepCausalInferenceAgent):
@@ -90,5 +91,16 @@ class BackwardInferenceAgent(StepByStepCausalInferenceAgent):
 
 class BackwardInferenceAgentFactory(AgentFactory[BackwardInferenceAgent]):
     
-    def __init__(self, path_to_system_prompt: str = 'causal_inference.yaml', use_prompt_lib_folder: bool = True):
+    def __init__(self, path_to_system_prompt: str = 'causal_inference_truncated.yaml', use_prompt_lib_folder: bool = True):
         super().__init__(BackwardInferenceAgent, path_to_system_prompt, use_prompt_lib_folder)
+
+    def createAgent(self, *args, **kwargs) -> BackwardInferenceAgent:
+        return super().createAgent(
+            *args,
+            additional_system_prompt_variables={
+                'variable': InferredVariableDefinition.get_definition(),
+                'causal_relationship': CausalRelationshipDefinition.get_definition()
+            },
+            final_answer_checks=[isInferredVariableDefinition],
+            **kwargs
+        )

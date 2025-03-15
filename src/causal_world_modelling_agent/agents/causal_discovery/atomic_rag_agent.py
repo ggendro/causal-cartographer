@@ -7,7 +7,7 @@ from smolagents import Model
 from ...utils.graph_utils import isDigraph
 from ...utils.message_utils import isGraphMessageDefinition
 from ..factory import AgentFactory
-from ...syntax.definitions import ObservedVariableDefinition, VariableDefinition, CausalRelationshipDefinition
+from ...syntax.definitions import VariableDefinition, CausalRelationshipDefinition
 from ...tools.retrieval import GraphRetrieverTool
 from ..custom_prompt_agent import CustomPromptAgent
 
@@ -16,14 +16,14 @@ class AtomicRAGDiscoveryAgent(CustomPromptAgent):
 
     def run(self, task: str, *args, **kwargs) -> nx.DiGraph:
         retrieval_tool = self.tools["graph_retriever"]
-        rag_task = task + retrieval_tool(task)
+        rag_task = task + '\n\n' + retrieval_tool(task)
 
         return super().run(rag_task, *args, **kwargs)
 
 
 class AtomicRAGDiscoveryAgentFactory(AgentFactory[AtomicRAGDiscoveryAgent]):
     
-    def __init__(self, path_to_system_prompt: str = 'rag_causal_discovery.yaml', use_prompt_lib_folder: bool = True, graph_save_path: Optional[str] = None, initial_graph: Optional[nx.DiGraph] = None, depth: int = 2, max_documents: int = 3):
+    def __init__(self, path_to_system_prompt: str = 'rag_causal_discovery_truncated.yaml', use_prompt_lib_folder: bool = True, graph_save_path: Optional[str] = None, initial_graph: Optional[nx.DiGraph] = None, depth: int = 2, max_documents: int = 3):
         super().__init__(AtomicRAGDiscoveryAgent, path_to_system_prompt, use_prompt_lib_folder)
 
         assert not (graph_save_path and initial_graph), "Either provide a graph save path or an initial graph, not both."
@@ -58,7 +58,6 @@ class AtomicRAGDiscoveryAgentFactory(AgentFactory[AtomicRAGDiscoveryAgent]):
             tools=[self.retrieval_tool],
             base_model=base_model,
             additional_system_prompt_variables={
-                'observed_variable': ObservedVariableDefinition.get_definition(),
                 'variable': VariableDefinition.get_definition(),
                 'causal_relationship': CausalRelationshipDefinition.get_definition(),
                 'retrieval_tool_name': self.retrieval_tool.name

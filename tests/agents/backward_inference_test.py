@@ -12,7 +12,9 @@ class TestBackwardInferenceAgent:
 
     @pytest.fixture
     def backward_inference_agent(self):
-        return BackwardInferenceAgentFactory().createAgent(CountInferenceMockModel())
+        agent = BackwardInferenceAgentFactory().createAgent(CountInferenceMockModel())
+        agent.final_answer_checks = []
+        return agent
     
     @pytest.fixture
     def causal_graph_1(self):

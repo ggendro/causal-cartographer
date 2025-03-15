@@ -23,7 +23,7 @@ class MessageDefinition:
     
 
 @dataclass
-class EventDefinition(MessageDefinition):
+class EventDefinition(MessageDefinition): # TODO: assess if needs to be removed
     """{
         "name": <string>, # The name of the event
         "description": <string>, # The description of the event
@@ -37,39 +37,46 @@ class EventDefinition(MessageDefinition):
     location: str
     variables: List[str]
 
-@dataclass
-class VariableDefinition(MessageDefinition):
-    """{
-        "name": <string>, # The name of the variable
-        "description": <string>, # The description of the variable
-        "type": <string>, # The type of the variable (boolean, integer, float, string, etc.)
-        "values": <list>, # The set or range of possible values for the variable ([1, 2, 3], 'range(0,10)', ['low', 'medium', 'high'], 'True/False', 'natural numbers', etc.)
-        "supporting_text_snippets": <list>, # The supporting text snippets in which the variable is mentioned
-    }"""
+
+@dataclass 
+class _NodeDefinition(MessageDefinition):
     name: str
     description: str
     type: str
     values: List[str]
-    supporting_text_snippets: List[str]
 
 @dataclass
-class ObservedVariableDefinition(MessageDefinition):
+class VariableDefinition(_NodeDefinition):
     """{
         "name": <string>, # The name of the variable
         "description": <string>, # The description of the variable
         "type": <string>, # The type of the variable (boolean, integer, float, string, etc.)
-        "values": <list>, # The set or range of possible values for the variable
-        "supporting_text_snippets": <list>, # The supporting text snippets in which the variable is mentioned
-        "current_value": <string>, # The observed current value of the variable
-        "contextual_information": <string>, # The contextual information associated with the current value of the variable
+        "values": <List[str]>, # The set or range of possible values for the variable ([1, 2, 3], 'range(0,10)', ['low', 'medium', 'high'], 'True/False', 'natural numbers', etc.)
+        "supporting_text_snippets": <Optional[List[str]]>, # The supporting text snippets in which the variable is mentioned
+        "current_value": <Optional[string]>, # The observed current value of the variable
+        "contextual_information": <Optional[string]>, # The contextual information associated with the current value of the variable
     }"""
-    name: str
-    description: str
-    type: str
-    values: List[str]
-    supporting_text_snippets: List[str]
-    current_value: str
-    contextual_information: str
+    supporting_text_snippets: Optional[List[str]] = None
+    current_value: Optional[str] = None
+    contextual_information: Optional[str] = None
+
+
+@dataclass
+class _CausalEffectDefinition(MessageDefinition):
+    causal_effect: str
+
+@dataclass
+class InferredVariableDefinition(VariableDefinition, _CausalEffectDefinition):
+    """{
+        "name": <string>, # The name of the variable
+        "description": <string>, # The description of the variable
+        "type": <string>, # The type of the variable (boolean, integer, float, string, etc.)
+        "values": <List[str]>, # The set or range of possible values for the variable ([1, 2, 3], 'range(0,10)', ['low', 'medium', 'high'], 'True/False', 'natural numbers', etc.)
+        "causal_effect": <string>, # The inferred causal effect of the variable
+        "supporting_text_snippets": <Optional[List[str]]>, # The supporting text snippets in which the variable is mentioned
+        "current_value": <Optional[string]>, # The observed current value of the variable
+        "contextual_information": <Optional[string]>, # The contextual information associated with the current value of the variable
+    }"""
 
 @dataclass
 class CausalRelationshipDefinition(MessageDefinition):
@@ -77,17 +84,17 @@ class CausalRelationshipDefinition(MessageDefinition):
         "cause": <string>, # The name of the cause variable
         "effect": <string>, # The name of the effect variable
         "description": <string>, # The description of the causal relationship between the variables
-        "contextual_information": <string>, # The contextual information associated with the causal relationship for the specific observed values of the variables
+        "contextual_information": <Optional[string]>, # The contextual information associated with the causal relationship for the specific observed values of the variables
         "type": <string>, # The type of the causal relationship (direct, indirect, etc.)
-        "strength": <string>, # The strength of the causal relationship
-        "confidence": <string>, # The confidence level in the existence of the causal relationship
+        "strength": <Optional[string]>, # The strength of the causal relationship
+        "confidence": <Optional[string]>, # The confidence level in the existence of the causal relationship
         "function": <Optional[Callable]>, # The function that describes the causal relationship, if available.
     }"""
     cause: str
     effect: str
     description: str
-    contextual_information: str
     type: str
-    strength: str
-    confidence: str
+    contextual_information: Optional[str ] = None
+    strength: Optional[str] = None
+    confidence: Optional[str] = None
     function: Optional[Callable] = None
