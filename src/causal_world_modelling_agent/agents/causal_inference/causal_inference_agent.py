@@ -7,6 +7,7 @@ from ..factory import AgentFactory
 from ..custom_prompt_agent import CustomPromptAgent
 from ...syntax.definitions import Message, InferredVariableDefinition, CausalRelationshipDefinition
 from ...utils.message_utils import isInferredVariableDefinition
+from ...utils.inference_utils import update_graph_node_values_in_place, build_intervened_graph, find_causal_paths
 
 
 class StepByStepCausalInferenceAgent(CustomPromptAgent):
@@ -20,60 +21,8 @@ class StepByStepCausalInferenceAgent(CustomPromptAgent):
         self.python_executor.state = {}
 
 
-    def _update_node_values_in_place(self, causal_graph: nx.DiGraph, updates: Message, add_causal_effect: bool = True, reset_old_values: bool = False) -> None:
-        node_name = updates["name"]
-
-        if reset_old_values:
-            for key in causal_graph.nodes[node_name]:
-                if key != "name":
-                    del causal_graph.nodes[node_name][key]
-
-        for key, value in updates.items():
-            if key != "name":
-                causal_graph.nodes[node_name][key] = value
-
-        if add_causal_effect and "current_value" in updates and "causal_effect" not in updates:
-            causal_graph.nodes[node_name]["causal_effect"] = updates["current_value"]
-    
-
-    def _build_intervened_graph(self, causal_graph: nx.DiGraph, interventions: List[Message], structure_only: bool = False) -> nx.DiGraph:
-        intervened_graph = causal_graph.copy()
-        for intervention in interventions:
-            if not structure_only:
-                self._update_node_values_in_place(intervened_graph, intervention)
-            intervened_graph.remove_edges_from(list(intervened_graph.in_edges(intervention["name"])))
-        return intervened_graph
-    
-
-    def _path_to_chain(self, path: List[str], graph: nx.DiGraph) -> nx.DiGraph:
-        chain = nx.DiGraph()
-        chain.add_nodes_from(path)
-
-        for a, b in zip(path[:-1], path[1:]):
-            if graph.has_edge(a, b):
-                chain.add_edge(a, b)
-            elif graph.has_edge(b, a):
-                chain.add_edge(b, a)
-            else:
-                raise ValueError("Path does not exist in graph")
-        
-        return chain
-
-    def _find_causal_paths(self, causal_graph: nx.DiGraph, source: str, target: str, conditioning_set: List[str]) -> List[List[str]]:
-        candidate_paths = nx.all_simple_paths(causal_graph.to_undirected(as_view=True), source=source, target=target, cutoff=self.traversal_cutoff)
-
-        causal_paths = []
-        for path in candidate_paths:
-            chain = self._path_to_chain(path, causal_graph)
-            conditioning_subset = set(conditioning_set) & set(chain.nodes)
-            if not nx.is_d_separator(chain, source, target, conditioning_subset):
-                causal_paths.append(path)
-
-        return causal_paths
-
-
     def _prune_graph(self, causal_graph: nx.DiGraph, target_variable: str, observations: List[Message], interventions: List[Message]) -> nx.DiGraph:
-        intervened_graph = self._build_intervened_graph(causal_graph, interventions, structure_only=True)
+        intervened_graph = build_intervened_graph(causal_graph, interventions, structure_only=True)
 
         # Add nodes that are both observed and intervened on using the twin graph method
         obs_and_inter_nodes = set([observation["name"] for observation in observations]) & set([intervention["name"] for intervention in interventions])
@@ -89,7 +38,7 @@ class StepByStepCausalInferenceAgent(CustomPromptAgent):
         kept_nodes = set([target_variable])
         conditioning_set = set([observation["name"] for observation in observations] + [intervention["name"] for intervention in interventions] + list(obs_and_inter_nodes.keys()))
         for node_name in conditioning_set:
-            paths = self._find_causal_paths(intervened_graph, node_name, target_variable, conditioning_set - {node_name})
+            paths = find_causal_paths(intervened_graph, node_name, target_variable, conditioning_set - {node_name}, self.traversal_cutoff)
             kept_nodes |= set([n for path in paths for n in path])
 
         # Update twin nodes with their real values
@@ -114,7 +63,7 @@ class StepByStepCausalInferenceAgent(CustomPromptAgent):
                 
             updated_variable = super().run(*run_args, additional_args={parent_name: [causal_graph.nodes[parent] for parent in parents], 'target_variable': causal_graph.nodes[target_variable], 'causal_relationships': list(causal_graph.in_edges(target_variable, data=True))}, **run_kwargs)
             self._reset_state()
-            self._update_node_values_in_place(causal_graph, updated_variable)
+            update_graph_node_values_in_place(causal_graph, updated_variable)
 
     def _estimate_causal_effect(self, causal_graph: nx.DiGraph, target_variable: str, run_args: Tuple, run_kwargs: Dict, anticausal: bool = False) -> Tuple[str, nx.DiGraph]:
         causal_graph = causal_graph.copy()
@@ -133,7 +82,7 @@ class StepByStepCausalInferenceAgent(CustomPromptAgent):
                 abduction_nodes.append(node)
 
         for observation in observations:
-            self._update_node_values_in_place(causal_graph, observation)
+            update_graph_node_values_in_place(causal_graph, observation)
         
         abductions = []
         for node in abduction_nodes:
@@ -147,7 +96,7 @@ class StepByStepCausalInferenceAgent(CustomPromptAgent):
                     _, updated_subgraph = self._estimate_causal_effect(subgraph, collider, run_args, run_kwargs)
                     for updated_node in updated_subgraph.nodes:
                         if "causal_effect" in updated_subgraph.nodes[updated_node]:
-                            self._update_node_values_in_place(pruned_reverse_graph, updated_subgraph.nodes[updated_node])
+                            update_graph_node_values_in_place(pruned_reverse_graph, updated_subgraph.nodes[updated_node])
 
             # Compute values of abduction nodes
             _, updated_graph = self._estimate_causal_effect(pruned_reverse_graph, node, run_args, run_kwargs, anticausal=True)
@@ -173,17 +122,17 @@ class StepByStepCausalInferenceAgent(CustomPromptAgent):
         # Compute abductions
         abductions = self._compute_abductions(pruned_graph, observations, interventions, run_args, run_kwargs)
         for abduction in abductions:
-            self._update_node_values_in_place(pruned_graph, abduction)
+            update_graph_node_values_in_place(pruned_graph, abduction)
 
         # Intervene on the causal graph
-        intervened_graph = self._build_intervened_graph(pruned_graph, interventions, structure_only=False)
+        intervened_graph = build_intervened_graph(pruned_graph, interventions, structure_only=False)
 
         # Add observations that are not affected by the interventions
         intervention_names = set([intervention["name"] for intervention in interventions])
         for observation in observations:
             observation_name = observation["name"]
             if observation_name not in intervention_names and intervened_graph.in_degree(observation_name) == 0: # TODO: verify that condition is correct
-                self._update_node_values_in_place(intervened_graph, observation)
+                update_graph_node_values_in_place(intervened_graph, observation)
 
         # Make predictions
         causal_effect, updated_causal_graph = self._estimate_causal_effect(intervened_graph, target_variable, run_args, run_kwargs)

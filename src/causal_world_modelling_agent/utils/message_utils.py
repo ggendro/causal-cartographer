@@ -9,7 +9,7 @@ def isMessageDefinition(data: Dict, definition: MessageDefinition) -> bool:
     try:
         definition.from_dict(data)
         return True
-    except TypeError as e: # TODO: modify excpetion logging to be more informative
+    except TypeError as e: # TODO: modify exception logging to be more informative
         raise e
     
 def isVariableDefinition(answer: Dict, memory: Optional[List[Any]] = None) -> bool:

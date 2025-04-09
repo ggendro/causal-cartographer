@@ -19,7 +19,11 @@ class MessageDefinition:
         return cls(**data)
     
     def to_dict(self) -> Message:
-        return self.__dict__
+        d = self.__dict__
+        for key in list(d.keys()):
+            if d[key] is None:
+                del d[key]
+        return d
     
 
 @dataclass

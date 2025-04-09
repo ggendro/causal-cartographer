@@ -12,7 +12,7 @@ from langchain_core.embeddings import Embeddings
 
 class GraphRetrieverTool(Tool): # from https://huggingface.co/docs/smolagents/examples/rag and https://python.langchain.com/docs/integrations/retrievers/graph_rag/
     name = "graph_retriever"
-    description = "Uses semantic search to retrieve the subpgraph of the causal knowledge graph database that could be most relevant to answer your query."
+    description = "Uses semantic search to retrieve the subgraph of the causal knowledge graph database that could be most relevant to answer your query."
     inputs = {
         "query": {
             "type": "string",
@@ -90,3 +90,6 @@ class GraphRetrieverTool(Tool): # from https://huggingface.co/docs/smolagents/ex
             str_edges += "<empty>"
 
         return f"{str_nodes}\n\n{str_edges}"
+    
+
+__all__ = ['GraphRetrieverTool']

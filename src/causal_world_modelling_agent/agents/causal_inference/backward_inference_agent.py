@@ -7,6 +7,7 @@ from ..factory import AgentFactory
 from .causal_inference_agent import StepByStepCausalInferenceAgent
 from ...syntax.definitions import Message, InferredVariableDefinition, CausalRelationshipDefinition
 from ...utils.message_utils import isInferredVariableDefinition
+from ...utils.inference_utils import update_graph_node_values_in_place, find_causal_paths
 
 
 class BackwardInferenceAgent(StepByStepCausalInferenceAgent):
@@ -28,7 +29,7 @@ class BackwardInferenceAgent(StepByStepCausalInferenceAgent):
             source_name = source_node["name"]
             for target_node in counterfactual_outcomes:
                 target_name = target_node["name"]
-                paths = self._find_causal_paths(causal_graph, source_name, target_name, conditioning_set - {source_name})
+                paths = find_causal_paths(causal_graph, source_name, target_name, conditioning_set - {source_name}, self.traversal_cutoff)
                 kept_nodes |= set([n for path in paths for n in path])
 
         return causal_graph.subgraph(kept_nodes)
@@ -40,7 +41,7 @@ class BackwardInferenceAgent(StepByStepCausalInferenceAgent):
 
         # Update counterfactual outcomes
         for counterfactual_outcome in counterfactual_outcomes:
-            self._update_node_values_in_place(pruned_graph, counterfactual_outcome, add_causal_effect=True, reset_old_values=False)
+            update_graph_node_values_in_place(pruned_graph, counterfactual_outcome, add_causal_effect=True, reset_old_values=False)
 
         # Reverse graph
         reversed_graph = pruned_graph.reverse()
