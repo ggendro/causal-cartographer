@@ -102,6 +102,7 @@ def extract_world_nodes(graph: nx.DiGraph, key_syntax) -> Dict[str, Set[str]]:
 
     return worlds
 
+
 def ground_in_world(graph: nx.DiGraph, world_id: str | None, key_syntax: str) -> nx.DiGraph:
     """
     Remove node attribute keys that do not match the specified world_id.
@@ -124,6 +125,7 @@ def ground_in_world(graph: nx.DiGraph, world_id: str | None, key_syntax: str) ->
 
     return graph
 
+
 def find_shared_observations(observations_1: Dict[str, Message], observations_2: Dict[str, Message]) -> Dict[str, Message]:
     """
     Finds and returns the shared observations between two dictionaries of messages.
@@ -145,6 +147,7 @@ def find_shared_observations(observations_1: Dict[str, Message], observations_2:
             shared_observations[node_name] = observations_1[node_name]
 
     return shared_observations
+
 
 def find_active_interventions(causal_graph: nx.DiGraph, target_node: str, observations: Dict[str, Message], interventions: Dict[str, Message], traversal_cutoff: Optional[int] = None) -> Dict[str, Message]:    
     """
@@ -182,6 +185,7 @@ def find_active_interventions(causal_graph: nx.DiGraph, target_node: str, observ
 
     return active_interventions
 
+
 def find_non_blocking_observations(causal_graph: nx.DiGraph, target_node: str, observations: Dict[str, Message], blocking_observations: Dict[str, Message], interventions: Dict[str, Message], traversal_cutoff: Optional[int] = None) -> Dict[str, Message]:
     """
     Find observations that influence the target node while not blocking interventions and being blocked by the blocking observations.
@@ -209,7 +213,18 @@ def find_non_blocking_observations(causal_graph: nx.DiGraph, target_node: str, o
 
     return non_blocking_observations
 
-def find_mixing_coefficient_linear(causal_graph: nx.DiGraph, target_node: str, observations_1: Dict[str, Message], observations_2: Dict[str, Message], traversal_cutoff: Optional[int] = None, epsilon: float = 0.25, **kwargs) -> float:
+
+
+def find_mixing_coefficient_linear(
+        causal_graph: nx.DiGraph, 
+        target_node: str, 
+        observations_1: Dict[str, Message], 
+        observations_2: Dict[str, Message], 
+        traversal_cutoff: Optional[int] = None, 
+        epsilon: float = 0.25,
+        factual_target_value: Optional[str] = None,
+        counterfactual_target_value: Optional[str] = None,
+        **kwargs) -> Dict[str,float]:
     """
     Find the mixing coefficient between two sets of observations in a causal graph using linear combination.
     This function inspects the causal graph and determines the mixing coefficient between the expected outputs from two sets of observations. Only the outputs from the observed worlds are considered.
@@ -223,6 +238,8 @@ def find_mixing_coefficient_linear(causal_graph: nx.DiGraph, target_node: str, o
         observations_2  (Dict[str, Message]): A dictionary mapping node names to their corresponding messages representing the second set of observations.
         traversal_cutoff (Optional[int]): Optional maximum depth for searching causal paths; if provided, limits the traversal.
         epsilon (float): A small positive value used to control the sensitivity of the mixing coefficient calculation. It should be between 0 and 1 (exclusive).
+        factual_target_value (Optional[str]): The factual target value for the target node. If not provided, it is deduced from the observations.
+        counterfactual_target_value (Optional[str]): The counterfactual target value for the target node. If not provided, it is deduced from the observations.
     Returns:
         float: The mixing coefficient between the two sets of observations with respect to the target node.
     """
@@ -249,9 +266,32 @@ def find_mixing_coefficient_linear(causal_graph: nx.DiGraph, target_node: str, o
         return coeff
     
     coeff = _find_mix_rec(target_node, 0)
-    return 1 / (1 + math.exp(-coeff / epsilon)) # sigmoid function to normalize the coefficient between 0 and 1
+    coeff = 1 / (1 + math.exp(-coeff / epsilon)) # sigmoid function to normalize the coefficient between 0 and 1
 
-def find_mixing_coefficient_deviation_intervals(causal_graph: nx.DiGraph, target_node: str, observations_1: Dict[str, Message], observations_2: Dict[str, Message], traversal_cutoff: Optional[int] = None, epsilon: float = 0.25, world_set: Optional[List[nx.DiGraph]] = None, **kwargs) -> float:
+    if not factual_target_value: # Observing the target node may lead to inconsistencies in the ground truth. TODO: assess if it should be allowed
+        factual_target_value = observations_1[target_node]['current_value']
+    if not counterfactual_target_value: 
+        counterfactual_target_value = observations_2[target_node]['current_value']
+
+    ground_truth = {
+        factual_target_value: coeff,
+        counterfactual_target_value: 1 - coeff
+    }
+    return ground_truth
+
+
+
+def find_mixing_coefficient_deviation_intervals(
+        causal_graph: nx.DiGraph, 
+        target_node: str, 
+        observations_1: Dict[str, Message], 
+        observations_2: Dict[str, Message], 
+        traversal_cutoff: Optional[int] = None, 
+        epsilon: float = 0.25, 
+        world_set: Optional[List[nx.DiGraph]] = None,
+        factual_target_value: Optional[str] = None,
+        counterfactual_target_value: Optional[str] = None,
+        **kwargs) -> Dict[str,float]:
     """
     Find the mixing coefficient between sets of observations in a causal graph using entropy/uncertainty-based confidence intervals.
     This function inspects the causal graph and determines the mixing coefficient between the expected outputs from two sets of observations. Only the outputs from the observed worlds are considered.
@@ -266,6 +306,8 @@ def find_mixing_coefficient_deviation_intervals(causal_graph: nx.DiGraph, target
         traversal_cutoff (Optional[int]): Optional maximum depth for searching causal paths; if provided, limits the traversal.
         epsilon (float): A small positive value used to control the sensitivity of the mixing coefficient calculation. It should be between 0 and 1 (exclusive).
         world_set (Optional[List[nx.DiGraph]]): A list of causal graphs representing different instantiations of the causal network.
+        factual_target_value (Optional[str]): The factual target value for the target node. If not provided, it is deduced from the observations.
+        counterfactual_target_value (Optional[str]): The counterfactual target value for the target node. If not provided, it is deduced from the observations.
     Returns:
         float: The mixing coefficient between the two sets of observations with respect to the target node.
     """
@@ -322,7 +364,70 @@ def find_mixing_coefficient_deviation_intervals(causal_graph: nx.DiGraph, target
     
     min_coeff, max_coeff = _find_mix_rec(target_node, 0)
     coeff = (min_coeff + max_coeff) / 2 # average of the lower and upper bounds (unbiased estimate of the coefficient assuming symmetric uncertainty)
-    return 1 / (1 + math.exp(-coeff * (1 / epsilon))) # sigmoid function to normalize the coefficient between 0 and 1
+    coeff = 1 / (1 + math.exp(-coeff * (1 / epsilon))) # sigmoid function to normalize the coefficient between 0 and 1
+
+    if not factual_target_value: # Observing the target node may lead to inconsistencies in the ground truth. TODO: assess if it should be allowed
+        factual_target_value = observations_1[target_node]['current_value']
+    if not counterfactual_target_value:
+        counterfactual_target_value = observations_2[target_node]['current_value']
+
+    ground_truth = {
+        factual_target_value: coeff,
+        counterfactual_target_value: 1 - coeff
+    }
+    return ground_truth
+
+
+
+def find_mixing_coefficients_overlapping_beams(
+        causal_graph: nx.DiGraph, 
+        target_node: str, 
+        observations_1: Dict[str, Message], 
+        observations_2: Dict[str, Message],
+        temperature: float = 1.0,
+        traversal_cutoff: Optional[int] = None, # TODO: include in the entropy calculation
+        world_set: Optional[List[nx.DiGraph]] = None, 
+        **kwargs) -> Dict[str,float]:
+    """
+    Find the mixing coefficients between sets of observations in a causal graph using overlapping beams.
+    This function inspects the causal graph and determines the mixing coefficients for each likely output given the set of observations.
+    The mixing coefficients 
+    The coefficient is calculated recursively, and the traversal can be limited by a specified cutoff depth.
+    A higher mixing coefficient indicates a stronger influence of the set of observations 1 over the set of observations 2.
+    Parameters:
+        causal_graph (nx.DiGraph): A directed graph representing causal relationships among nodes.
+        target_node (str): The node for which the mixing coefficient is being calculated.
+        observations_1 (Dict[str, Message]): A dictionary mapping node names to their corresponding messages representing the first set of observations.
+        observations_2  (Dict[str, Message]): A dictionary mapping node names to their corresponding messages representing the second set of observations.
+        temperature (float): A small positive value used to control the sensitivity of the mixing coefficient calculation. It should be strictly positive.
+        traversal_cutoff (Optional[int]): Optional maximum depth for searching causal paths; if provided, limits the traversal.
+        world_set (Optional[List[nx.DiGraph]]): A list of causal graphs representing different instantiations of the causal network.
+    Returns:
+        float: The mixing coefficient between the two sets of observations with respect to the target node.
+    """
+    if temperature <= 0.0:
+        raise ValueError('Temperature must be strictly positive')
+
+    if world_set is None:
+        world_set = [causal_graph]
+    else:
+        for world in world_set:
+            if list(causal_graph.nodes) != list(world.nodes) or list(causal_graph.edges) != list(world.edges):
+                raise ValueError(f'Worlds must have the same structure as the causal graph. Found {world.nodes} and {world.edges} instead of {causal_graph.nodes} and {causal_graph.edges}')
+            
+    _, beams = observation_constrained_causal_graph_entropy(world_set, {**observations_1, **observations_2}, return_individual_entropies=False, return_node_instances=True)
+
+    # Etract the target node values from the set of possible worlds and the subset of worlds that are in the beam
+    target_all_values = set(world.nodes[target_node]['current_value'] for world in world_set)
+    target_beam_values = [node_instance['current_value'] for node_instance in beams[target_node]]
+
+    # Calculate the mixing coefficients for each value in the target node. Add 1 to the count to improve the stability of the distribution
+    value_counts = {value: 1 + target_beam_values.count(value) for value in target_all_values}
+    z_t = sum([c**(1 / temperature) for c in value_counts.values()])
+    target_value_probas = {value: (c**(1 / temperature)) / z_t for value, c in value_counts.items()}
+
+    return target_value_probas
+
 
 
 
@@ -512,6 +617,7 @@ class BaseWorldManager(_WorldManager):
         mix_funcs = {
             'linear': find_mixing_coefficient_linear,
             'intervals': find_mixing_coefficient_deviation_intervals,
+            'overlapping_beams': find_mixing_coefficients_overlapping_beams,
         }
 
         def generator_func(factual_world_id, counterfactual_world_id, common_dag, target_node, factual_graph, counterfactual_graph, shared_observations, num_interventions, world_set):
@@ -523,12 +629,11 @@ class BaseWorldManager(_WorldManager):
             }
             active_interventions = find_active_interventions(common_dag, target_node, factual_observations, counterfactual_observations, traversal_cutoff=self.traversal_cutoff)
 
-            coefficient = mix_funcs[mixing_function](common_dag, target_node, factual_observations, counterfactual_observations, traversal_cutoff=self.traversal_cutoff, world_set=world_set)
-
-            ground_truth = {
-                factual_graph.nodes[target_node]['current_value']: coefficient,
-                counterfactual_graph.nodes[target_node]['current_value']: 1 - coefficient
-            }
+            ground_truth = mix_funcs[mixing_function](
+                common_dag, target_node, factual_observations, counterfactual_observations, 
+                traversal_cutoff=self.traversal_cutoff, world_set=world_set, 
+                factual_target_value=factual_graph.nodes[target_node]['current_value'], 
+                counterfactual_target_value=counterfactual_graph.nodes[target_node]['current_value'])
 
             if len(active_interventions) < num_interventions: # Not enough active interventions to match counterfactuals
                 return

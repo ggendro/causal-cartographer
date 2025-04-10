@@ -101,7 +101,7 @@ def causal_graph_entropy(inference_graph_instantiations: List[nx.DiGraph], retur
 
 
 @tool
-def observation_constrained_causal_graph_entropy(inference_graph_instantiations: List[nx.DiGraph], observations: Dict[str, Message], return_individual_entropies: bool = False) -> float:
+def observation_constrained_causal_graph_entropy(inference_graph_instantiations: List[nx.DiGraph], observations: Dict[str, Message], return_individual_entropies: bool = False, return_node_instances: bool = False) -> float:
     """
     This is a tool that computes the entropy of a causal network given a set of observations. The entropy of a causal network is the joint entropy of all its variables.
     It is obtained by computing the sum of the conditional entropies of each node in the graph given its parents (and standard entropy of the root nodes).
@@ -112,6 +112,7 @@ def observation_constrained_causal_graph_entropy(inference_graph_instantiations:
                                         The structure of the causal graph is the same across all instantiations, but the values of the nodes may differ.
         observations: A dictionary of observed values for the variables in the causal network. This is used to condition the entropy calculation.
         return_individual_entropies: If True, the function will return a list of individual entropies for each node in the graph.
+        return_node_instances: If True, the function will return a dictionary of node instances for each node in the graph.
     Returns:
         The entropy of the causal network. If return_individual_entropies is True, a tuple is returned with the global entropy and a dictionary of individual entropies for each node in the graph.
     """
@@ -157,10 +158,8 @@ def observation_constrained_causal_graph_entropy(inference_graph_instantiations:
         _compute_entropy_rec(node)
 
     entropy = sum(entropies.values())
-    if return_individual_entropies:
-        return entropy, entropies
-    else:
-        return entropy
+    result = (entropy,) + (entropies,) * return_individual_entropies + (accepted_node_values,) * return_node_instances
+    return result if len(result) > 1 else result[0]
 
 
 __all__ = ['kolmogorov_complexity', 'causal_graph_entropy', 'observation_constrained_causal_graph_entropy']
