@@ -41,7 +41,7 @@ class StepByStepCausalInferenceAgent(CustomPromptAgent):
             paths = find_causal_paths(intervened_graph, node_name, target_variable, conditioning_set - {node_name}, self.traversal_cutoff)
             kept_nodes |= set([n for path in paths for n in path])
 
-        # Update twin nodes with their real values
+        # Update twin nodes with their real node names
         for node in obs_and_inter_nodes.keys():
             if node in kept_nodes:
                 kept_nodes.remove(node)
@@ -85,11 +85,11 @@ class StepByStepCausalInferenceAgent(CustomPromptAgent):
             update_graph_node_values_in_place(causal_graph, observation)
         
         abductions = []
+        reverse_graph = causal_graph.reverse(copy=True)
         for node in abduction_nodes:
-            reverse_graph = causal_graph.reverse(copy=True)
             pruned_reverse_graph = self._prune_graph(reverse_graph, node, observations, [])
             
-            # Perform an initial forward causal pass to compute values of colliders (i.e. nodes with no incoming edges in the reverse graph) and reduce the relaince on anticausal reasoning
+            # Perform an initial forward causal pass to compute values of colliders (i.e. nodes with no incoming edges in the reverse graph) and reduce the reliance on anticausal reasoning
             for collider in pruned_reverse_graph.nodes:
                 if node != collider and pruned_reverse_graph.in_degree(collider) == 0 and "causal_effect" not in pruned_reverse_graph.nodes[collider]:
                     subgraph = self._prune_graph(causal_graph, collider, [], observations) # treat observations as interventions to consider only direct causal effects, block backdoor paths and avoid infinite loops
@@ -105,9 +105,14 @@ class StepByStepCausalInferenceAgent(CustomPromptAgent):
         return abductions
     
 
-    def _run_counterfactual_query(self, causal_graph: nx.DiGraph, target_variable: str, observations: List[Message], interventions: List[Message], run_args: Tuple, run_kwargs: Dict) -> Tuple[str, nx.DiGraph]:
-        # Prune graph
-        pruned_graph = self._prune_graph(causal_graph, target_variable, observations, interventions)
+    def _run_counterfactual_query(self, causal_graph: nx.DiGraph, target_variable: str, observations: List[Message], interventions: List[Message], is_counterfactual: bool, run_args: Tuple, run_kwargs: Dict) -> Tuple[str, nx.DiGraph]:
+        # Prune graph (if is_counterfactual, two worlds are considered: the world of the observations and the world of the interventions, i.e. observations cannot block interventions)
+        if is_counterfactual:
+            factual_graph = self._prune_graph(causal_graph, target_variable, observations, [])
+            counterfactual_graph = self._prune_graph(causal_graph, target_variable, [], interventions)
+            pruned_graph = nx.compose(factual_graph, counterfactual_graph)
+        else:
+            pruned_graph = self._prune_graph(causal_graph, target_variable, observations, interventions)
 
         # Remove pruned nodes from observations
         for i in range(len(observations) - 1, -1, -1):
@@ -127,11 +132,11 @@ class StepByStepCausalInferenceAgent(CustomPromptAgent):
         # Intervene on the causal graph
         intervened_graph = build_intervened_graph(pruned_graph, interventions, structure_only=False)
 
-        # Add observations that are not affected by the interventions
+        # Add observations that are not affected by the interventions (in normal settings, it corresponds to all observations affecting the target and in counterfactual settings, it omits those updated by the interventions)
         intervention_names = set([intervention["name"] for intervention in interventions])
         for observation in observations:
             observation_name = observation["name"]
-            if observation_name not in intervention_names and intervened_graph.in_degree(observation_name) == 0: # TODO: verify that condition is correct
+            if observation_name not in intervention_names and intervened_graph.in_degree(observation_name) == 0:
                 update_graph_node_values_in_place(intervened_graph, observation)
 
         # Make predictions
@@ -168,6 +173,11 @@ class StepByStepCausalInferenceAgent(CustomPromptAgent):
         if target_variable in [intervention["name"] for intervention in interventions]:
             raise ValueError("Target variable cannot be intervened on")
 
+        if "is_counterfactual" not in additional_args:
+            is_counterfactual = False
+        else:
+            is_counterfactual = additional_args["is_counterfactual"]
+
         for node in causal_graph.nodes:
             if "current_value" in causal_graph.nodes[node]:
                 del causal_graph.nodes[node]["current_value"]
@@ -176,7 +186,7 @@ class StepByStepCausalInferenceAgent(CustomPromptAgent):
             if "causal_effect" in causal_graph.nodes[node]:
                 del causal_graph.nodes[node]["causal_effect"]
 
-        return self._run_counterfactual_query(causal_graph, target_variable, observations, interventions, args, kwargs)
+        return self._run_counterfactual_query(causal_graph, target_variable, observations, interventions, is_counterfactual, args, kwargs)
 
 
 

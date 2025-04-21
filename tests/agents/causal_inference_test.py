@@ -239,6 +239,15 @@ class TestCausalInferenceAgent:
         assert answer_graph.nodes['C']['causal_effect'] == 0
         assert answer_graph.nodes['D']['causal_effect'] == 3
 
+    def test_run_2_with_abductions_is_counterfactual(self, causal_inference_agent, causal_graph_2):
+        answer_text, answer_graph = causal_inference_agent.run("Hello world!", additional_args={'causal_graph': causal_graph_2, 'is_counterfactual': True, 'target_variable': 'D', 'observations': [{'name': 'C', 'current_value': 2}], 'interventions': [{'name': 'C', 'current_value': 0}]})
+        
+        assert answer_text == 3
+        assert answer_graph.nodes['A']['causal_effect'] == 1
+        assert answer_graph.nodes['B']['causal_effect'] == 2
+        assert answer_graph.nodes['C']['causal_effect'] == 0
+        assert answer_graph.nodes['D']['causal_effect'] == 3
+
     def test_run_3_with_observations(self, causal_inference_agent, causal_graph_3):
         answer_text, answer_graph = causal_inference_agent.run("Hello world!", additional_args={'causal_graph': causal_graph_3, 'target_variable': 'G', 'observations': [{'name': 'A', 'current_value': 1}]})
         
@@ -299,6 +308,18 @@ class TestCausalInferenceAgent:
         assert answer_graph.nodes['F']['causal_effect'] == 4
         assert answer_graph.nodes['G']['causal_effect'] == 0
 
+    def test_run_3_with_abductions_is_counterfactual(self, causal_inference_agent, causal_graph_3):
+        answer_text, answer_graph = causal_inference_agent.run("Hello world!", additional_args={'causal_graph': causal_graph_3, 'is_counterfactual': True, 'target_variable': 'G', 'observations': [{'name': 'B', 'current_value': 2}, {'name': 'F', 'current_value': 2}], 'interventions': [{'name': 'B', 'current_value': 4}, {'name': 'F', 'current_value': 4}]})
+
+        assert answer_text == 0
+        assert answer_graph.nodes['A']['causal_effect'] == -6
+        assert answer_graph.nodes['B']['causal_effect'] == 4
+        assert answer_graph.nodes['C']['causal_effect'] == -5
+        assert answer_graph.nodes['D']['causal_effect'] == 0
+        assert answer_graph.nodes['E']['causal_effect'] == 1
+        assert answer_graph.nodes['F']['causal_effect'] == 4
+        assert answer_graph.nodes['G']['causal_effect'] == 0
+
     def test_run_3_with_abductions_2(self, causal_inference_agent, causal_graph_3):
         answer_text, answer_graph = causal_inference_agent.run("Hello world!", additional_args={'causal_graph': causal_graph_3, 'target_variable': 'G', 'observations': [{'name': 'B', 'current_value': 2}, {'name': 'F', 'current_value': 2}], 'interventions': [{'name': 'C', 'current_value': 4}, {'name': 'E', 'current_value': 4}]})
 
@@ -310,6 +331,18 @@ class TestCausalInferenceAgent:
         assert answer_graph.nodes['E']['causal_effect'] == 4
         assert answer_graph.nodes['F']['causal_effect'] == 2
         assert answer_graph.nodes['G']['causal_effect'] == 3
+
+    def test_run_3_with_abductions_2_is_counterfactual(self, causal_inference_agent, causal_graph_3):
+        answer_text, answer_graph = causal_inference_agent.run("Hello world!", additional_args={'causal_graph': causal_graph_3, 'is_counterfactual': True, 'target_variable': 'G', 'observations': [{'name': 'B', 'current_value': 2}, {'name': 'F', 'current_value': 2}], 'interventions': [{'name': 'C', 'current_value': 4}, {'name': 'E', 'current_value': 4}]})
+
+        assert answer_text == 0
+        assert answer_graph.nodes['A']['causal_effect'] == -6
+        assert answer_graph.nodes['B']['causal_effect'] == -5
+        assert answer_graph.nodes['C']['causal_effect'] == 4
+        assert answer_graph.nodes['D']['causal_effect'] == 0
+        assert answer_graph.nodes['E']['causal_effect'] == 4
+        assert answer_graph.nodes['F']['causal_effect'] == 1
+        assert answer_graph.nodes['G']['causal_effect'] == 0
 
     def test_run_4_no_observations(self, causal_inference_agent, causal_graph_4):
         answer_text, answer_graph = causal_inference_agent.run("Hello world!", additional_args={'causal_graph': causal_graph_4, 'target_variable': 'C'})
@@ -375,6 +408,14 @@ class TestCausalInferenceAgent:
         assert answer_graph.nodes['B']['causal_effect'] == -1
         assert answer_graph.nodes['C']['causal_effect'] == 0
 
+    def test_run_4_with_interventions_4_is_counterfactual(self, causal_inference_agent, causal_graph_4):
+        answer_text, answer_graph = causal_inference_agent.run("Hello world!", additional_args={'causal_graph': causal_graph_4, 'is_counterfactual': True, 'target_variable': 'C', 'observations': [{'name': 'A', 'current_value': 0}], 'interventions': [{'name': 'B', 'current_value': -1}]})
+
+        assert answer_text == 0
+        assert answer_graph.nodes['A']['causal_effect'] == 0
+        assert answer_graph.nodes['B']['causal_effect'] == -1
+        assert answer_graph.nodes['C']['causal_effect'] == 0
+
     def test_run_4_with_intervention_5(self, causal_inference_agent, causal_graph_4):
         answer_text, answer_graph = causal_inference_agent.run("Hello world!", additional_args={'causal_graph': causal_graph_4, 'target_variable': 'C', 'observations': [{'name': 'B', 'current_value': 0}], 'interventions': [{'name': 'A', 'current_value': -1}]})
 
@@ -382,6 +423,14 @@ class TestCausalInferenceAgent:
         assert 'A' not in answer_graph.nodes
         assert answer_graph.nodes['B']['causal_effect'] == 0
         assert answer_graph.nodes['C']['causal_effect'] == 1
+
+    def test_run_4_with_intervention_5_is_counterfactual(self, causal_inference_agent, causal_graph_4):
+        answer_text, answer_graph = causal_inference_agent.run("Hello world!", additional_args={'causal_graph': causal_graph_4, 'is_counterfactual': True, 'target_variable': 'C', 'observations': [{'name': 'B', 'current_value': 0}], 'interventions': [{'name': 'A', 'current_value': -2}]})
+
+        assert answer_text == 0
+        assert answer_graph.nodes['A']['causal_effect'] == -2
+        assert answer_graph.nodes['B']['causal_effect'] == -1
+        assert answer_graph.nodes['C']['causal_effect'] == 0
 
     def test_run_5_with_observations(self, causal_inference_agent, causal_graph_5):
         answer_text, answer_graph = causal_inference_agent.run("Hello world!", additional_args={'causal_graph': causal_graph_5, 'target_variable': 'C', 'observations': [{'name': 'A', 'current_value': 2}]})
@@ -393,6 +442,14 @@ class TestCausalInferenceAgent:
 
     def test_run_5_with_interventions(self, causal_inference_agent, causal_graph_5):
         answer_text, answer_graph = causal_inference_agent.run("Hello world!", additional_args={'causal_graph': causal_graph_5, 'target_variable': 'C', 'interventions': [{'name': 'A', 'current_value': 2}]})
+
+        assert answer_text == 1
+        assert 'A' not in answer_graph.nodes
+        assert 'B' not in answer_graph.nodes
+        assert answer_graph.nodes['C']['causal_effect'] == 1
+
+    def test_run_5_with_interventions_is_counterfactual(self, causal_inference_agent, causal_graph_5):
+        answer_text, answer_graph = causal_inference_agent.run("Hello world!", additional_args={'causal_graph': causal_graph_5, 'is_counterfactual': True, 'target_variable': 'C', 'interventions': [{'name': 'A', 'current_value': 2}]})
 
         assert answer_text == 1
         assert 'A' not in answer_graph.nodes

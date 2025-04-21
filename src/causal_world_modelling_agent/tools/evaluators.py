@@ -49,7 +49,7 @@ def causal_variable_conditional_entropy(values: List[Message], parent_values: Di
 
     for i, value in enumerate(values):
         curr_value = value['current_value']
-        parent_values_i = [parent_values[parent][i]['current_value'] for parent in parent_values] # TODO: optimize
+        parent_values_i = [parent_values[parent][i]['current_value'] for parent in parent_values]
         joint_key = (curr_value, *tuple(parent_values_i))
         parent_key = tuple(parent_values_i)
 

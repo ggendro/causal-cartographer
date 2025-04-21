@@ -11,12 +11,12 @@ class TestGrounding:
     @pytest.fixture
     def worlds_graph(self):
         G = nx.DiGraph()
-        G.add_node("A", base_attribute_1="value_1", base_attribute_2="value_2", world_0="attr_world_0", world_1="attr_world_1")
-        G.add_node("B", base_attribute_1="value_3", base_attribute_2="value_4", world_0="attr_world_0", world_1="attr_world_1")
+        G.add_node("A", base_attribute_1="value_1", base_attribute_2="value_2", world_0={"attr_world_0": 0}, world_1="attr_world_1")
+        G.add_node("B", base_attribute_1="value_3", base_attribute_2="value_4", world_0={"attr_world_0": 0}, world_1="attr_world_1")
         G.add_node("C", base_attribute_2="value_5", base_attribute_3="value_6", world_1="attr_world_0", world_2="attr_world_1")
         G.add_node("D", base_attribute_1="value_7", base_attribute_3="value_8")
         G.add_node("E", world_17="attr_world_0")
-        G.add_node("F", world_20="attr_world_1", world_21="attr_world_1", world_22="attr_world_1", world_0="attr_world_0")
+        G.add_node("F", world_20="attr_world_1", world_21="attr_world_1", world_22="attr_world_1", world_0={"attr_world_0": 0})
         G.add_node("G", xworld_0="attr_world_0")
         G.add_node("H", world_0x="attr_world_0")
         G.add_edges_from([("A", "B"), ("B", "C"), ("C", "D"), ("D", "F"), ("F", "G"), ("G", "H")])
@@ -74,10 +74,11 @@ class TestGrounding:
 
         for node, attrs in result.nodes(data=True):
             for attr in attrs:
-                if re.fullmatch(key, attr):
-                    assert attr == "world_0"
-                    assert node in expected_nodes
-                assert result.nodes[node][attr] == worlds_graph.nodes[node][attr]
+                assert re.fullmatch(key, attr) is None
+                if attr == "attr_world_0":
+                    assert result.nodes[node][attr] == worlds_graph.nodes[node]['world_0'][attr] # grounded attribute of world 0
+                else:
+                    assert result.nodes[node][attr] == worlds_graph.nodes[node][attr]
 
     def test_ground_in_world_no_matching_nodes(self, worlds_graph):
         key = r"world_\d+"

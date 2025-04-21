@@ -2,6 +2,8 @@
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Callable
 import inspect
+import networkx as nx
+import re
 
 
 Message = Dict[str, str]
@@ -102,3 +104,79 @@ class CausalRelationshipDefinition(MessageDefinition):
     strength: Optional[str] = None
     confidence: Optional[str] = None
     function: Optional[Callable] = None
+
+
+
+
+World = nx.DiGraph
+WorldSet = nx.DiGraph
+
+
+def isWorld(graph: World) -> bool:
+    """
+    Check if the given graph is a valid world representation.
+    
+    Args:
+        graph (World): The graph to check.
+        
+    Returns:
+        bool: True if the graph is a valid world representation, False otherwise.
+    """
+    if not isinstance(graph, nx.DiGraph):
+        return False
+    
+    for node, data in graph.nodes(data=True):
+        if 'name' not in data or data['name'] != node:
+            return False
+        try:
+            VariableDefinition.from_dict(data)
+        except TypeError:
+            return False
+    
+    for cause, effect, data in graph.edges(data=True):
+        if 'cause' not in data or 'effect' not in data or data['cause'] != cause or data['effect'] != effect:
+            return False
+        try:
+            CausalRelationshipDefinition.from_dict(data)
+        except TypeError:
+            return False
+    
+    return True
+
+def isWorldSet(graph: WorldSet) -> bool:
+    """
+    Check if the given graph is a valid world set representation.
+    
+    Args:
+        graph (WorldSet): The graph to check.
+        
+    Returns:
+        bool: True if the graph is a valid world set representation, False otherwise.
+    """
+    if not isinstance(graph, nx.DiGraph):
+        return False
+    
+    for node, data in graph.nodes(data=True):
+        if 'name' not in data or data['name'] != node:
+            return False
+        if not any(re.match(r'world_\d+', node) for node in graph.nodes):
+            return False
+        
+        worlds = [attrs for attrs in data if attrs.startswith('world_')]
+        remaining_attrs = list(set(data.keys()) - set(worlds))
+
+        for world in worlds:
+            try:
+                VariableDefinition.from_dict(**{**world, **remaining_attrs})
+            except TypeError:
+                return False    
+    
+    for cause, effect, data in graph.edges(data=True):
+        if 'cause' not in data or 'effect' not in data or data['cause'] != cause or data['effect'] != effect:
+            return False
+        try:
+            CausalRelationshipDefinition.from_dict(data)
+        except TypeError:
+            return False
+    
+    return True

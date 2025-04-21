@@ -7,7 +7,7 @@ import re
 import itertools
 import math
 
-from ..syntax.definitions import Message, VariableDefinition, _CausalEffectDefinition
+from ..syntax.definitions import Message, VariableDefinition, _CausalEffectDefinition, World, WorldSet
 from ..utils.inference_utils import build_target_node_causal_blanket, dagify, find_causal_paths, build_intervened_graph
 from ..tools.evaluators import observation_constrained_causal_graph_entropy
 
@@ -20,6 +20,7 @@ class Query:
     target_node: str
     ground_truth: str
     is_pseudo_gt: bool = False
+    is_counterfactual: bool = False
     observations: Optional[List[Message]] = None
     interventions: Optional[List[Message]] = None
 
@@ -27,11 +28,11 @@ class Query:
 
 class _WorldManager(ABC):
 
-    def __init__(self, initial_graph: Optional[nx.DiGraph] = None, graphs: Optional[List[nx.DiGraph]] = None, traversal_cutoff: Optional[int] = None):
+    def __init__(self, initial_graph: Optional[WorldSet] = None, graphs: Optional[List[World]] = None, traversal_cutoff: Optional[int] = None):
         self.traversal_cutoff = traversal_cutoff
 
         if initial_graph is None:
-            self.graph = nx.DiGraph()
+            self.graph = WorldSet()
         else:
             self.graph = initial_graph.copy()
 
@@ -39,7 +40,7 @@ class _WorldManager(ABC):
             for graph in graphs:
                 self.merge(graph)
         
-    def get_complete_graph(self) -> nx.DiGraph:
+    def get_complete_graph(self) -> WorldSet:
         return self.graph
     
     def get_traversal_cutoff(self) -> Optional[int]:
@@ -49,33 +50,33 @@ class _WorldManager(ABC):
         self.traversal_cutoff = traversal_cutoff
 
     @abstractmethod
-    def merge(self, new_graph: nx.DiGraph, *args, **kwargs) -> None:
+    def merge(self, new_graph: World, *args, **kwargs) -> None:
         pass
     
     @abstractmethod
-    def get_worlds(self) -> Dict[str, nx.DiGraph]:
+    def get_worlds(self) -> Dict[str, World]:
         pass
 
     @abstractmethod
-    def get_world(self, world_id: str) -> nx.DiGraph:
+    def get_world(self, world_id: str) -> World:
         pass
 
     @abstractmethod
-    def get_worlds_from_node(self, target_node: str) -> Dict[str, nx.DiGraph]:
+    def get_worlds_from_node(self, target_node: str) -> Dict[str, World]:
         pass
 
     @abstractmethod
-    def match_counterfactuals(self, target_node: str, num_interventions: int = 1) -> Generator[Query, None, None]:
+    def generate_counterfactuals_match(self, target_node: str, num_interventions: int = 1) -> Generator[Query, None, None]:
         pass
 
     @abstractmethod
-    def mix_counterfactuals(self, target_node: str, num_interventions: int = 1) -> Generator[Query, None, None]:
+    def generate_counterfactuals_mix(self, target_node: str, num_interventions: int = 1) -> Generator[Query, None, None]:
         pass
 
 
 
 
-def extract_world_nodes(graph: nx.DiGraph, key_syntax) -> Dict[str, Set[str]]:
+def extract_world_nodes(graph: World, key_syntax) -> Dict[str, Set[str]]:
     """
     Extract nodes from a directed graph based on matching attribute keys.
     This function iterates over each node in the provided NetworkX directed graph and
@@ -83,7 +84,7 @@ def extract_world_nodes(graph: nx.DiGraph, key_syntax) -> Dict[str, Set[str]]:
     the matching portion of the key is used as the world identifier, and the node is added
     to the set associated with that identifier.
     Parameters:
-        graph (nx.DiGraph): A directed graph whose nodes contain attribute dictionaries.
+        graph (nx.DiGraph | World): A directed graph whose nodes contain attribute dictionaries.
         key_syntax (str or Pattern): A regular expression (or compiled regex pattern) used to
             match attribute keys. The portion of the key that matches is treated as a world ID.
     Returns:
@@ -103,25 +104,51 @@ def extract_world_nodes(graph: nx.DiGraph, key_syntax) -> Dict[str, Set[str]]:
     return worlds
 
 
-def ground_in_world(graph: nx.DiGraph, world_id: str | None, key_syntax: str) -> nx.DiGraph:
+def ground_in_world(graph: WorldSet, world_id: str | None, key_syntax: str) -> World:
     """
-    Remove node attribute keys that do not match the specified world_id.
+    Remove node world attribute keys that do not match the specified world_id and ground attributes mathcing the world_id (i.e. remove the world_id wrapper).
     This function iterates over all nodes in the graph and inspects each attribute key. If a key matches the provided regular expression pattern (key_syntax)
-    but its matched group (group(0)) is not equal to the specified world_id, the key is removed from the node's attributes. The moethod returns a copy of the graph with the specified keys removed.
+    but its matched group (group(0)) is not equal to the specified world_id, the key is removed from the node's attributes. The method returns a copy of the graph with the specified keys removed.
     Parameters:
-        graph (nx.DiGraph): The input directed graph whose nodes may contain attribute keys.
+        graph (nx.DiGraph | WorldSet): The input directed graph whose nodes may contain attribute keys.
         world_id (str | None): The identifier used to determine which attribute keys to preserve. Keys with a matching group equal to this identifier are kept. If None, all keys matching the key_syntax are removed.
         key_syntax (str): A regular expression pattern used to match keys in the node attributes.
     Returns:
         nx.DiGraph: A modified copy of the input graph with attribute keys removed according to the specified criteria.
     """
     graph = graph.copy()
-    for _, attrs in graph.nodes(data=True):
+    for node, attrs in graph.nodes(data=True):
+        world_attrs = {}
+        
         for key in list(attrs.keys()):
             key_match = re.fullmatch(key_syntax, key)
             if key_match is not None:
-                if key_match.group(0) != world_id:
-                    del attrs[key]
+                if key_match.group(0) == world_id:
+                    world_attrs.update(attrs[key])
+                del attrs[key]
+                
+        graph.nodes[node].update(world_attrs) # Update the node attributes with the world attributes
+
+    return graph
+
+def remove_world_attributes(graph: World, attributes: Optional[List[str]] = None) -> World:
+    """
+    Remove specified world attributes from the nodes of a directed graph.
+    This function iterates over all nodes in the graph and removes the specified attributes from each node's attribute dictionary.
+    Parameters:
+        graph (nx.DiGraph | World): The input directed graph whose nodes may contain world attributes.
+        attributes (Optional[List[str]]): A list of attribute names to be removed from each node. If None,default world attributes are removed.
+    Returns:
+        nx.DiGraph: A modified copy of the input graph with the specified attributes removed from each node.
+    """
+    if attributes is None:
+        attributes = list(VariableDefinition.__annotations__.keys()) + list(_CausalEffectDefinition.__annotations__.keys())
+
+    graph = graph.copy()
+    for node, attrs in graph.nodes(data=True):
+        for attr in attributes:
+            if attr in attrs:
+                del attrs[attr]
 
     return graph
 
@@ -149,14 +176,14 @@ def find_shared_observations(observations_1: Dict[str, Message], observations_2:
     return shared_observations
 
 
-def find_active_interventions(causal_graph: nx.DiGraph, target_node: str, observations: Dict[str, Message], interventions: Dict[str, Message], traversal_cutoff: Optional[int] = None) -> Dict[str, Message]:    
+def find_active_interventions(causal_graph: World, target_node: str, observations: Dict[str, Message], interventions: Dict[str, Message], traversal_cutoff: Optional[int] = None) -> Dict[str, Message]:    
     """
     Find active interventions that influence a target node in a causal graph.
     This function inspects each intervention (excluding the target node itself) and determines if there exists at least
     one causal path from the intervention node to the target node within the provided causal graph. Paths are determined
     using observed nodes as a conditioning set and can be bounded by a specified traversal cutoff.
     Parameters:
-        causal_graph (nx.DiGraph): A directed graph representing causal relationships among nodes.
+        causal_graph (nx.DiGraph | World): A directed graph representing causal relationships among nodes.
         target_node (str): The node for which the active interventions are being identified.
         observations (Dict[str, Message]): A dictionary mapping observed node names to their corresponding messages. Observations are used as a conditioning set for pathfinding.
         interventions (Dict[str, Message]): A dictionary mapping intervention node names to their intervention messages. The returned dictionary is a subset of this one, containing only those interventions that have at least one non-blocked causal path to the target node.
@@ -186,13 +213,13 @@ def find_active_interventions(causal_graph: nx.DiGraph, target_node: str, observ
     return active_interventions
 
 
-def find_non_blocking_observations(causal_graph: nx.DiGraph, target_node: str, observations: Dict[str, Message], blocking_observations: Dict[str, Message], interventions: Dict[str, Message], traversal_cutoff: Optional[int] = None) -> Dict[str, Message]:
+def find_non_blocking_observations(causal_graph: World, target_node: str, observations: Dict[str, Message], blocking_observations: Dict[str, Message], interventions: Dict[str, Message], traversal_cutoff: Optional[int] = None) -> Dict[str, Message]:
     """
     Find observations that influence the target node while not blocking interventions and being blocked by the blocking observations.
     This function inspects each observation and determines if there exists at least one causal path from the observation node to the target node within the provided causal graph. 
     Paths are determined using observed nodes and can be bounded by a specified traversal cutoff. Interventions act as blocking nodes. Conversely, at least one blocking observation must be on the path.
     Parameters:
-        causal_graph (nx.DiGraph): A directed graph representing causal relationships among nodes.
+        causal_graph (nx.DiGraph | World): A directed graph representing causal relationships among nodes.
         target_node (str): The node for which the non-blocking observations are being identified.
         observations (Dict[str, Message]): A dictionary mapping observed node names to their corresponding messages. The returned dictionary is a subset of this one, containing only those observations that have at least one causal path to the target node respecting the conditions.
         blocking_observations (Dict[str, Message]): A dictionary mapping blocking node names to their corresponding messages. Blocking observations must be on the path to the target node.
@@ -216,7 +243,7 @@ def find_non_blocking_observations(causal_graph: nx.DiGraph, target_node: str, o
 
 
 def find_mixing_coefficient_linear(
-        causal_graph: nx.DiGraph, 
+        causal_graph: World, 
         target_node: str, 
         observations_1: Dict[str, Message], 
         observations_2: Dict[str, Message], 
@@ -232,7 +259,7 @@ def find_mixing_coefficient_linear(
     The coefficient is calculated recursively, and the traversal can be limited by a specified cutoff depth.
     A higher mixing coefficient indicates a stronger influence of the set of observations 1 over the set of observations 2.
     Parameters:
-        causal_graph (nx.DiGraph): A directed graph representing causal relationships among nodes.
+        causal_graph (nx.DiGraph | World): A directed graph representing causal relationships among nodes.
         target_node (str): The node for which the mixing coefficient is being calculated.
         observations_1 (Dict[str, Message]): A dictionary mapping node names to their corresponding messages representing the first set of observations.
         observations_2  (Dict[str, Message]): A dictionary mapping node names to their corresponding messages representing the second set of observations.
@@ -282,13 +309,13 @@ def find_mixing_coefficient_linear(
 
 
 def find_mixing_coefficient_deviation_intervals(
-        causal_graph: nx.DiGraph, 
+        causal_graph: World, 
         target_node: str, 
         observations_1: Dict[str, Message], 
         observations_2: Dict[str, Message], 
         traversal_cutoff: Optional[int] = None, 
         epsilon: float = 0.25, 
-        world_set: Optional[List[nx.DiGraph]] = None,
+        world_set: Optional[List[World]] = None,
         factual_target_value: Optional[str] = None,
         counterfactual_target_value: Optional[str] = None,
         **kwargs) -> Dict[str,float]:
@@ -299,13 +326,13 @@ def find_mixing_coefficient_deviation_intervals(
     The coefficient is calculated recursively, and the traversal can be limited by a specified cutoff depth.
     A higher mixing coefficient indicates a stronger influence of the set of observations 1 over the set of observations 2.
     Parameters:
-        causal_graph (nx.DiGraph): A directed graph representing causal relationships among nodes.
+        causal_graph (nx.DiGraph | World): A directed graph representing causal relationships among nodes.
         target_node (str): The node for which the mixing coefficient is being calculated.
         observations_1 (Dict[str, Message]): A dictionary mapping node names to their corresponding messages representing the first set of observations.
         observations_2  (Dict[str, Message]): A dictionary mapping node names to their corresponding messages representing the second set of observations.
         traversal_cutoff (Optional[int]): Optional maximum depth for searching causal paths; if provided, limits the traversal.
         epsilon (float): A small positive value used to control the sensitivity of the mixing coefficient calculation. It should be between 0 and 1 (exclusive).
-        world_set (Optional[List[nx.DiGraph]]): A list of causal graphs representing different instantiations of the causal network.
+        world_set (Optional[List[nx.DiGraph | World]]): A list of causal graphs representing different instantiations of the causal network.
         factual_target_value (Optional[str]): The factual target value for the target node. If not provided, it is deduced from the observations.
         counterfactual_target_value (Optional[str]): The counterfactual target value for the target node. If not provided, it is deduced from the observations.
     Returns:
@@ -318,7 +345,7 @@ def find_mixing_coefficient_deviation_intervals(
         world_set = [causal_graph]
     else:
         for world in world_set:
-            if list(causal_graph.nodes) != list(world.nodes) or list(causal_graph.edges) != list(world.edges):
+            if set(causal_graph.nodes) != set(world.nodes) or set(causal_graph.edges) != set(world.edges):
                 raise ValueError(f'Worlds must have the same structure as the causal graph. Found {world.nodes} and {world.edges} instead of {causal_graph.nodes} and {causal_graph.edges}')
 
 
@@ -380,13 +407,13 @@ def find_mixing_coefficient_deviation_intervals(
 
 
 def find_mixing_coefficients_overlapping_beams(
-        causal_graph: nx.DiGraph, 
+        causal_graph: World, 
         target_node: str, 
         observations_1: Dict[str, Message], 
         observations_2: Dict[str, Message],
         temperature: float = 1.0,
         traversal_cutoff: Optional[int] = None, # TODO: include in the entropy calculation
-        world_set: Optional[List[nx.DiGraph]] = None, 
+        world_set: Optional[List[World]] = None, 
         **kwargs) -> Dict[str,float]:
     """
     Find the mixing coefficients between sets of observations in a causal graph using overlapping beams.
@@ -395,13 +422,13 @@ def find_mixing_coefficients_overlapping_beams(
     The coefficient is calculated recursively, and the traversal can be limited by a specified cutoff depth.
     A higher mixing coefficient indicates a stronger influence of the set of observations 1 over the set of observations 2.
     Parameters:
-        causal_graph (nx.DiGraph): A directed graph representing causal relationships among nodes.
+        causal_graph (nx.DiGraph | World): A directed graph representing causal relationships among nodes.
         target_node (str): The node for which the mixing coefficient is being calculated.
         observations_1 (Dict[str, Message]): A dictionary mapping node names to their corresponding messages representing the first set of observations.
         observations_2  (Dict[str, Message]): A dictionary mapping node names to their corresponding messages representing the second set of observations.
         temperature (float): A small positive value used to control the sensitivity of the mixing coefficient calculation. It should be strictly positive.
         traversal_cutoff (Optional[int]): Optional maximum depth for searching causal paths; if provided, limits the traversal.
-        world_set (Optional[List[nx.DiGraph]]): A list of causal graphs representing different instantiations of the causal network.
+        world_set (Optional[List[nx.DiGraph | World]]): A list of causal graphs representing different instantiations of the causal network.
     Returns:
         float: The mixing coefficient between the two sets of observations with respect to the target node.
     """
@@ -412,7 +439,7 @@ def find_mixing_coefficients_overlapping_beams(
         world_set = [causal_graph]
     else:
         for world in world_set:
-            if list(causal_graph.nodes) != list(world.nodes) or list(causal_graph.edges) != list(world.edges):
+            if set(causal_graph.nodes) != set(world.nodes) or set(causal_graph.edges) != set(world.edges):
                 raise ValueError(f'Worlds must have the same structure as the causal graph. Found {world.nodes} and {world.edges} instead of {causal_graph.nodes} and {causal_graph.edges}')
             
     _, beams = observation_constrained_causal_graph_entropy(world_set, {**observations_1, **observations_2}, return_individual_entropies=False, return_node_instances=True)
@@ -433,11 +460,15 @@ def find_mixing_coefficients_overlapping_beams(
 
 class BaseWorldManager(_WorldManager):
 
-    def __init__(self, initial_graph: Optional[nx.DiGraph] = None, graphs: Optional[List[nx.DiGraph]] = None, traversal_cutoff: Optional[int] = None):
-        super().__init__(initial_graph, graphs, traversal_cutoff)
+    def __init__(self, initial_graph: Optional[WorldSet] = None, graphs: Optional[List[World]] = None, traversal_cutoff: Optional[int] = None):
         self.world_key_syntax = r'world_\d+'
-        self.world_nodes = extract_world_nodes(self.graph, self.world_key_syntax)
-        self.world_count = max([int(key.split('_')[-1]) for key in self.world_nodes.keys()]) + 1
+        self.world_nodes = {}
+        self.world_count = 0
+        super().__init__(initial_graph, graphs, traversal_cutoff)
+
+        if initial_graph is not None:
+            self.world_nodes = extract_world_nodes(self.graph, self.world_key_syntax)
+            self.world_count = max([int(key.split('_')[-1]) for key in self.world_nodes.keys()]) + 1
     
 
     def merge(self, new_graph: nx.DiGraph, current_world: Optional[str] = None, **kwargs) -> None:
@@ -447,12 +478,12 @@ class BaseWorldManager(_WorldManager):
             self.world_nodes[current_world] = set()
 
         new_graph = new_graph.copy()
-        grounded_attributes = list([VariableDefinition.__annotations__.keys(), _CausalEffectDefinition.__annotations__.keys()])
+        grounded_attributes = list(VariableDefinition.__annotations__.keys()) + list(_CausalEffectDefinition.__annotations__.keys())
         for node, attrs in new_graph.nodes(data=True):
             self.world_nodes[current_world].add(node)
 
             world_attrs = {}
-            for key in attrs.keys():
+            for key in list(attrs.keys()):
                 if key in grounded_attributes:
                     world_attrs[key] = attrs[key]
                     del attrs[key]
@@ -471,7 +502,7 @@ class BaseWorldManager(_WorldManager):
                 self.graph.edges[source, target].update(attrs)
     
 
-    def get_world(self, world_id: str) -> nx.DiGraph:
+    def get_world(self, world_id: str) -> World:
         if world_id not in self.world_nodes:
             raise ValueError(f'World {world_id} not found')
         
@@ -481,7 +512,7 @@ class BaseWorldManager(_WorldManager):
         return world_graph
     
     
-    def get_worlds(self) -> Dict[str, nx.DiGraph]:
+    def get_worlds(self) -> Dict[str, World]:
         worlds = {}
         for world_id in self.world_nodes:
             worlds[world_id] = self.get_world(world_id)
@@ -489,19 +520,20 @@ class BaseWorldManager(_WorldManager):
         return worlds
     
 
-    def get_worlds_from_node(self, target_node: str) -> Dict[str, nx.DiGraph]:
+    def get_worlds_from_node(self, target_node: str) -> Dict[str, World]:
         worlds = {}
         for world_id, nodes in self.world_nodes.items():
             if target_node in nodes:
                 world_graph = self.get_world(world_id)
-                world_graph = nx.node_connected_component(world_graph, target_node) # Remove nodes not connected to target node
+                connected_nodes = nx.node_connected_component(world_graph.to_undirected(), target_node) # Remove nodes not connected to target node
+                world_graph = world_graph.subgraph(connected_nodes)
 
                 worlds[world_id] = world_graph
 
         return worlds
     
 
-    def generate_observations(self, target_node: str) -> Generator[Message, None, None]:
+    def generate_observations(self, target_node: str) -> Generator[Query, None, None]:
         for world_id, nodes in self.world_nodes.items():
             world_graph = self.get_world(world_id)
             if target_node in world_graph.nodes and 'current_value' in world_graph.nodes[target_node]:
@@ -509,22 +541,29 @@ class BaseWorldManager(_WorldManager):
                 observations = {node: world_graph.nodes[node] for node in world_graph.nodes if node != target_node}
 
                 exist_blanket = True
-                while exist_blanket and len(observations) > 0:
+                iterations = 0 # Limit the number of iterations to avoid infinite loops
+                while exist_blanket and len(observations) > 0 and iterations < 100:
+                    iterations += 1
                     try:
-                        causal_blanket = build_target_node_causal_blanket(world_graph, target_node, observations.keys())
+                        causal_blanket_nodes = build_target_node_causal_blanket(world_graph, target_node, observations.keys())
+                        causal_blanket = world_graph.subgraph(causal_blanket_nodes).copy()
+                        blanket_observations = {node: world_graph.nodes[node] for node in causal_blanket if node != target_node and causal_blanket.in_degree(node) == 0}
+                        
                         dags = dagify(causal_blanket)
-                        blanket_observations = {node: world_graph.nodes[node] for node in causal_blanket if node != target_node}
-                        observations = {node: world_graph.nodes[node] for node in observations if node not in blanket_observations}
-
                         for dag in dags:
+                            dag = remove_world_attributes(dag) # Remove world attributes from the graph
                             yield Query(
                                 world_ids=[world_id],
                                 causal_graph=dag,
                                 target_node=target_node,
                                 ground_truth=ground_truth,
                                 is_pseudo_gt=False,
-                                observations=blanket_observations,
+                                is_counterfactual=False,
+                                observations=list(blanket_observations.values())
                             )
+                        
+                        observations = {node: value for node, value in observations.items() if node not in blanket_observations} # Remove the observations that are in the blanket to generate the next set of observations
+
                     except nx.NetworkXNoPath:
                         exist_blanket = False
                     
@@ -537,20 +576,32 @@ class BaseWorldManager(_WorldManager):
         candidate_worlds = self.get_worlds_from_node(target_node)
 
         # Establish causal blanket and dagify graph for inference
-        worlds_with_blanket = {}
+        worlds_with_blanket = []
+
+        prev_offset = 0
+        offset = {}
         for world_id, world_graph in candidate_worlds.items():
             if target_node in world_graph.nodes and 'current_value' in world_graph.nodes[target_node]:
                 try:
-                    causal_blanket = build_target_node_causal_blanket(world_graph, target_node, list(world_graph.nodes))
-                    dag = dagify(causal_blanket)
-                    worlds_with_blanket[world_id] = dag
+                    causal_blanket_nodes = build_target_node_causal_blanket(world_graph, target_node, list(set(world_graph.nodes) - {target_node}))
+                    causal_blanket = world_graph.subgraph(causal_blanket_nodes).copy()
+                    dags = dagify(causal_blanket)
+                    nb_dags = 0
+
+                    for dag in dags:
+                        if len(dag.nodes) > 0 and len(dag.edges) > 0 and target_node in dag.nodes:
+                            worlds_with_blanket.append((world_id, dag))
+                            nb_dags += 1
+                    
+                    offset[world_id] = prev_offset + nb_dags
+                    prev_offset = offset[world_id]
                 except nx.NetworkXNoPath:
                     continue
         
-        for i, (world_id_1, world_graph_1) in enumerate(worlds_with_blanket.items()):
-            for world_id_2, world_graph_2 in worlds_with_blanket.items()[i+1:]:
-                observations_1_nodes = self.world_nodes[world_id_1]
-                observations_2_nodes = self.world_nodes[world_id_2]
+        for i, (world_id_1, world_graph_1) in enumerate(worlds_with_blanket):
+            for world_id_2, world_graph_2 in worlds_with_blanket[offset[world_id_1]:]:
+                observations_1_nodes = self.world_nodes[world_id_1] & set(world_graph_1.nodes)
+                observations_2_nodes = self.world_nodes[world_id_2] & set(world_graph_2.nodes)
 
                 if len(observations_1_nodes & observations_2_nodes) == 0: # No common observed nodes between worlds, counterfactuals cannot be matched
                     continue
@@ -559,56 +610,63 @@ class BaseWorldManager(_WorldManager):
                     common_dag = nx.DiGraph()
                     common_dag.add_nodes_from(set(world_graph_1.nodes) | set(world_graph_2.nodes))
                     common_dag.add_edges_from(set(world_graph_1.edges) | set(world_graph_2.edges))
-                    common_dag = ground_in_world(common_dag, None, self.world_key_syntax)
+                    common_dag = remove_world_attributes(common_dag)
 
                     shared_observations = find_shared_observations(
                         {node_name: world_graph_1.nodes[node_name] for node_name in observations_1_nodes}, 
                         {node_name: world_graph_2.nodes[node_name] for node_name in observations_2_nodes}
                         )
-                    if len(shared_observations) == 0: # No shared observations between worlds, counterfactuals cannot be matched
-                        continue
-
-                    else:
-                        for (factual_world_id, factual_graph), (counterfactual_world_id, counterfactual_graph) in itertools.permutations([(world_id_1, world_graph_1), (world_id_2, world_graph_2)], 2):
-                            yield from generator_func(
-                                factual_world_id=factual_world_id,
-                                counterfactual_world_id=counterfactual_world_id,
-                                common_dag=common_dag,
-                                target_node=target_node,
-                                factual_graph=factual_graph,
-                                counterfactual_graph=counterfactual_graph,
-                                shared_observations=shared_observations,
-                                num_interventions=num_interventions,
-                                world_set=worlds_with_blanket,
-                            )
+                    if target_node in shared_observations:
+                        del shared_observations[target_node]
+                    
+                    for (factual_world_id, factual_graph), (counterfactual_world_id, counterfactual_graph) in itertools.permutations([(world_id_1, world_graph_1), (world_id_2, world_graph_2)], 2):
+                        yield from generator_func(
+                            factual_world_id=factual_world_id,
+                            counterfactual_world_id=counterfactual_world_id,
+                            common_dag=common_dag,
+                            target_node=target_node,
+                            factual_graph=factual_graph,
+                            counterfactual_graph=counterfactual_graph,
+                            shared_observations=shared_observations,
+                            num_interventions=num_interventions,
+                            world_set=[dag for _, dag in worlds_with_blanket]
+                        )
 
     def generate_counterfactuals_match(self, target_node: str, num_interventions: int = 1) -> Generator[Query, None, None]:
         def generator_func(factual_world_id, counterfactual_world_id, common_dag, target_node, factual_graph, counterfactual_graph, shared_observations, num_interventions, world_set):
-            factual_observations = {
-                node_name: factual_graph.nodes[node_name] for node_name in self.world_nodes[factual_world_id] if node_name not in shared_observations
-            }
-            counterfactual_observations = {
-                node_name: counterfactual_graph.nodes[node_name] for node_name in self.world_nodes[counterfactual_world_id]
-            }
-            active_interventions = find_active_interventions(common_dag, target_node, factual_observations, counterfactual_observations, traversal_cutoff=self.traversal_cutoff)
-            ground_truth = counterfactual_graph.nodes[target_node]['current_value']
-
-            if len(active_interventions) < num_interventions: # Not enough active interventions to match counterfactuals
-                return
             
-            else:
-                for intervention_combination in itertools.combinations(active_interventions, num_interventions):
-                    selected_observations = find_non_blocking_observations(common_dag, target_node, factual_observations, shared_observations, intervention_combination, traversal_cutoff=self.traversal_cutoff)
+            if len(shared_observations) == 0: # No shared observations between worlds, counterfactuals cannot be matched
+                return
 
-                    yield Query(
-                        world_ids=[factual_world_id, counterfactual_world_id],
-                        causal_graph=common_dag,
-                        target_node=target_node,
-                        ground_truth=ground_truth,
-                        is_pseudo_gt=False,
-                        observations=selected_observations,
-                        interventions=intervention_combination,
-                    )
+            else:
+                factual_observations = {
+                    node_name: factual_graph.nodes[node_name] for node_name in self.world_nodes[factual_world_id] 
+                        if node_name in factual_graph.nodes and node_name not in shared_observations
+                }
+                counterfactual_observations = {
+                    node_name: counterfactual_graph.nodes[node_name] for node_name in self.world_nodes[counterfactual_world_id] 
+                        if node_name in counterfactual_graph.nodes and node_name not in shared_observations and node_name != target_node
+                }
+                
+                active_interventions = find_active_interventions(common_dag, target_node, shared_observations, counterfactual_observations, traversal_cutoff=self.traversal_cutoff)
+                
+                ground_truth = counterfactual_graph.nodes[target_node]['current_value']
+
+                if len(active_interventions) < num_interventions: # Not enough active interventions to match counterfactuals
+                    return
+                
+                else:
+                    for intervention_combination in itertools.combinations(active_interventions.values(), num_interventions):
+                        yield Query(
+                            world_ids=[factual_world_id, counterfactual_world_id],
+                            causal_graph=common_dag,
+                            target_node=target_node,
+                            ground_truth=ground_truth,
+                            is_pseudo_gt=False,
+                            is_counterfactual=True,
+                            observations=list(factual_observations.values()), # TODO: assess if a condition should be added over observations: i.e. in the twin graph, non-shared observations should be blocked from the counterfactual target by shared observations (this property might be true without modifications needed (?))
+                            interventions=intervention_combination,
+                        )
 
         return self._generate_counterfactuals(target_node, generator_func, num_interventions)
 
@@ -622,12 +680,15 @@ class BaseWorldManager(_WorldManager):
 
         def generator_func(factual_world_id, counterfactual_world_id, common_dag, target_node, factual_graph, counterfactual_graph, shared_observations, num_interventions, world_set):
             factual_observations = {
-                node_name: factual_graph.nodes[node_name] for node_name in self.world_nodes[factual_world_id] if node_name not in shared_observations
+                node_name: factual_graph.nodes[node_name] for node_name in self.world_nodes[factual_world_id] 
+                    if node_name in factual_graph.nodes and node_name not in shared_observations
             }
             counterfactual_observations = {
-                node_name: counterfactual_graph.nodes[node_name] for node_name in self.world_nodes[counterfactual_world_id]
+                node_name: counterfactual_graph.nodes[node_name] for node_name in self.world_nodes[counterfactual_world_id] 
+                    if node_name in counterfactual_graph.nodes and node_name not in shared_observations and node_name != target_node
             }
-            active_interventions = find_active_interventions(common_dag, target_node, factual_observations, counterfactual_observations, traversal_cutoff=self.traversal_cutoff)
+
+            active_interventions = find_active_interventions(common_dag, target_node, shared_observations, counterfactual_observations, traversal_cutoff=self.traversal_cutoff)
 
             ground_truth = mix_funcs[mixing_function](
                 common_dag, target_node, factual_observations, counterfactual_observations, 
@@ -639,15 +700,16 @@ class BaseWorldManager(_WorldManager):
                 return
             
             else:
-                for intervention_combination in itertools.combinations(active_interventions, num_interventions):
+                for intervention_combination in itertools.combinations(active_interventions.values(), num_interventions):
                     yield Query(
                         world_ids=[factual_world_id, counterfactual_world_id],
                         causal_graph=common_dag,
                         target_node=target_node,
                         ground_truth=ground_truth,
                         is_pseudo_gt=True,
-                        observations=factual_observations,
-                        interventions=intervention_combination,
+                        is_counterfactual=True,
+                        observations=list(factual_observations.values()),
+                        interventions=list(intervention_combination),
                     )
 
         return self._generate_counterfactuals(target_node, generator_func, num_interventions)
