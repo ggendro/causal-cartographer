@@ -396,7 +396,7 @@ class TestWorldManager:
 
         assert query.is_counterfactual == False
         assert query.world_ids == ["world_0"]
-        assert query.target_node == "B"
+        assert query.target_variable == "B"
         assert list(query.causal_graph.nodes) == list(populated_world_manager.get_complete_graph().nodes)
         assert list(query.causal_graph.edges) == list(populated_world_manager.get_complete_graph().edges)
         assert query.ground_truth == populated_world_manager.get_complete_graph().nodes["B"]["world_0"]["current_value"]
@@ -445,7 +445,7 @@ class TestWorldManager:
             assert isinstance(observation, Query)
             assert observation.is_counterfactual == False
             assert observation.world_ids == [f"world_{i}"]
-            assert observation.target_node == "B"
+            assert observation.target_variable == "B"
             assert list(observation.causal_graph.nodes) == list(populated_world_manager.get_complete_graph().nodes)
             assert list(observation.causal_graph.edges) == list(populated_world_manager.get_complete_graph().edges)
             assert observation.ground_truth == populated_world_manager.get_complete_graph().nodes["B"][f"world_{i}"]["current_value"]
@@ -461,7 +461,7 @@ class TestWorldManager:
         query = observations[0]
         assert query.is_counterfactual == False
         assert query.world_ids == ["world_0"]
-        assert query.target_node == "D"
+        assert query.target_variable == "D"
         assert list(query.causal_graph.nodes) == ['B', 'C', 'D']
         assert list(query.causal_graph.edges) == [('B', 'D'), ('C', 'D')]
         assert query.ground_truth == diamond_world_manager.get_complete_graph().nodes["D"]["world_0"]["current_value"]
@@ -473,7 +473,7 @@ class TestWorldManager:
         query = observations[1]
         assert query.is_counterfactual == False
         assert query.world_ids == ["world_0"]
-        assert query.target_node == "D"
+        assert query.target_variable == "D"
         assert list(query.causal_graph.nodes) == list(diamond_world_manager.get_complete_graph().nodes)
         assert list(query.causal_graph.edges) == list(diamond_world_manager.get_complete_graph().edges)
         assert query.ground_truth == diamond_world_manager.get_complete_graph().nodes["D"]["world_0"]["current_value"]
@@ -491,7 +491,7 @@ class TestWorldManager:
             assert isinstance(query, Query)
             assert query.is_counterfactual == False
             assert query.world_ids == ["world_0"]
-            assert query.target_node == "Node_4"
+            assert query.target_variable == "Node_4"
             assert list(query.causal_graph.nodes) == [f"Node_{j}" for j in range(3 - i, 5)]
             assert list(query.causal_graph.edges) == [(f"Node_{j}", f"Node_{j+1}") for j in range(3 - i, 4)]
             assert query.ground_truth == chain_world_manager.get_complete_graph().nodes["Node_4"]["world_0"]["current_value"]
@@ -536,7 +536,7 @@ class TestWorldManager:
         assert isinstance(counterfactuals[0], Query)
         query = counterfactuals[0]
         assert query.world_ids == ["world_0", "world_1"]
-        assert query.target_node == "D"
+        assert query.target_variable == "D"
         assert set(query.causal_graph.nodes) == set(['D', 'C', 'B'])
         assert set(query.causal_graph.edges) == set([('B', 'D'), ('C', 'D')])
         assert query.ground_truth == diamond_world_manager_multiple.get_complete_graph().nodes["D"]["world_1"]["current_value"]
@@ -550,7 +550,7 @@ class TestWorldManager:
         assert isinstance(counterfactuals[1], Query)
         query = counterfactuals[1]
         assert query.world_ids == ["world_1", "world_0"]
-        assert query.target_node == "D"
+        assert query.target_variable == "D"
         assert set(query.causal_graph.nodes) == set(['C', 'B', 'D'])
         assert set(query.causal_graph.edges) == set([('B', 'D'), ('C', 'D')])
         assert query.ground_truth == diamond_world_manager_multiple.get_complete_graph().nodes["D"]["world_0"]["current_value"]
@@ -584,7 +584,7 @@ class TestWorldManager:
         assert isinstance(counterfactuals[0], Query)
         query = counterfactuals[0]
         assert query.world_ids == ["world_0", "world_1"]
-        assert query.target_node == "D"
+        assert query.target_variable == "D"
         assert set(query.causal_graph.nodes) == set(['D', 'C', 'B'])
         assert set(query.causal_graph.edges) == set([('B', 'D'), ('C', 'D')])
         assert query.is_pseudo_gt == True
@@ -603,7 +603,7 @@ class TestWorldManager:
         assert isinstance(counterfactuals[1], Query)
         query = counterfactuals[1]
         assert query.world_ids == ["world_1", "world_0"]
-        assert query.target_node == "D"
+        assert query.target_variable == "D"
         assert set(query.causal_graph.nodes) == set(['C', 'B', 'D'])
         assert set(query.causal_graph.edges) == set([('B', 'D'), ('C', 'D')])
         assert query.is_pseudo_gt == True

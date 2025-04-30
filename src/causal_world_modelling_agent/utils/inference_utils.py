@@ -33,7 +33,7 @@ def update_graph_node_values_in_place(causal_graph: nx.DiGraph, updates: Message
                 del causal_graph.nodes[node_name][key]
 
     for key, value in updates.items():
-        if key != "name":
+        if key != "name" or "name" not in causal_graph.nodes[node_name]:
             causal_graph.nodes[node_name][key] = value
 
     if add_causal_effect and "current_value" in updates and "causal_effect" not in updates:

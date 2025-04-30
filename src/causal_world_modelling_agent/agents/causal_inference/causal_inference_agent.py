@@ -36,7 +36,7 @@ class StepByStepCausalInferenceAgent(CustomPromptAgent):
         intervened_graph.remove_edges_from(list(intervened_graph.out_edges(target_variable))) # key aspect: we compute the causal effect from parent knowledge only
 
         kept_nodes = set([target_variable])
-        conditioning_set = set([observation["name"] for observation in observations] + [intervention["name"] for intervention in interventions] + list(obs_and_inter_nodes.keys()))
+        conditioning_set = set([observation["name"] for observation in observations] + [intervention["name"] for intervention in interventions] + list(obs_and_inter_nodes.keys())) - set([target_variable])
         for node_name in conditioning_set:
             paths = find_causal_paths(intervened_graph, node_name, target_variable, conditioning_set - {node_name}, self.traversal_cutoff)
             kept_nodes |= set([n for path in paths for n in path])
@@ -154,29 +154,29 @@ class StepByStepCausalInferenceAgent(CustomPromptAgent):
             raise ValueError("Target variable must be provided as an argument")
         target_variable = additional_args["target_variable"]
         
-        if "observations" not in additional_args:
+        if "observations" not in additional_args or additional_args["observations"] is None:
             observations = []
         else:
             observations = additional_args["observations"]
         
-        if "interventions" not in additional_args:
+        if "interventions" not in additional_args or additional_args["interventions"] is None:
             interventions = []
         else:
             interventions = additional_args["interventions"]
 
         if target_variable not in causal_graph.nodes:
             raise ValueError("Target variable not found in causal graph")
-        
-        if target_variable in [observation["name"] for observation in observations]:
-            raise ValueError("Target variable cannot be observed")
-        
-        if target_variable in [intervention["name"] for intervention in interventions]:
-            raise ValueError("Target variable cannot be intervened on")
 
         if "is_counterfactual" not in additional_args:
             is_counterfactual = False
         else:
             is_counterfactual = additional_args["is_counterfactual"]
+        
+        if not is_counterfactual and target_variable in [observation["name"] for observation in observations]:
+            raise ValueError("Target variable cannot be observed unless in counterfactual mode")
+        
+        if target_variable in [intervention["name"] for intervention in interventions]:
+            raise ValueError("Target variable cannot be intervened on")
 
         for node in causal_graph.nodes:
             if "current_value" in causal_graph.nodes[node]:

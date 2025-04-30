@@ -1,5 +1,5 @@
 
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 import networkx as nx
 import io
 import math
@@ -67,7 +67,7 @@ def causal_variable_conditional_entropy(values: List[Message], parent_values: Di
     return entropy
 
 @tool
-def causal_graph_entropy(inference_graph_instantiations: List[nx.DiGraph], return_individual_entropies: bool = False) -> float:
+def causal_graph_entropy(inference_graph_instantiations: List[nx.DiGraph], return_individual_entropies: bool = False, reference_graph: Optional[nx.DiGraph] = None) -> float:
     """
     This is a tool that computes the entropy of a causal network. The entropy of a causal network is the joint entropy of all its variables.
     It is obtained by computing the sum of the conditional entropies of each node in the graph given its parents (and standard entropy of the root nodes).
@@ -76,21 +76,26 @@ def causal_graph_entropy(inference_graph_instantiations: List[nx.DiGraph], retur
         inference_graph_instantiations: A list of causal graphs, each representing a different instantiation of the causal network. 
                                         The structure of the causal graph is the same across all instantiations, but the values of the nodes may differ.
         return_individual_entropies: If True, the function will return a list of individual entropies for each node in the graph.
+        reference_graph: A reference graph to use for the entropy calculation. If None, the first graph in inference_graph_instantiations is used as the reference graph.
+                         This argument should be provided if the inference_graph_instantiations do not all have the same structure.
     Returns:
         The entropy of the causal network. If return_individual_entropies is True, a tuple is returned with the global entropy and a dictionary of individual entropies for each node in the graph.
     """
     entropy = 0.0
     entropies = {}
-    reference_graph = inference_graph_instantiations[0]
+    
+    if reference_graph is None:
+        reference_graph = inference_graph_instantiations[0]
+
     for node in reference_graph.nodes:
         parents = list(reference_graph.predecessors(node))
-        instantiations = [graph.nodes[node] for graph in inference_graph_instantiations]
+        instantiations = [graph.nodes[node] for graph in inference_graph_instantiations if node in graph.nodes]
         
         if not parents:
             entropies[node] = causal_variable_entropy(instantiations)
             entropy += entropies[node]
         else:
-            parent_instantiations = {parent: [graph.nodes[parent] for graph in inference_graph_instantiations] for parent in parents}
+            parent_instantiations = {parent: [graph.nodes[parent] for graph in inference_graph_instantiations if parent in graph.nodes] for parent in parents}
             entropies[node] = causal_variable_conditional_entropy(instantiations, parent_instantiations)
             entropy += entropies[node]
     
@@ -101,7 +106,7 @@ def causal_graph_entropy(inference_graph_instantiations: List[nx.DiGraph], retur
 
 
 @tool
-def observation_constrained_causal_graph_entropy(inference_graph_instantiations: List[nx.DiGraph], observations: Dict[str, Message], return_individual_entropies: bool = False, return_node_instances: bool = False) -> float:
+def observation_constrained_causal_graph_entropy(inference_graph_instantiations: List[nx.DiGraph], observations: Dict[str, Message], return_individual_entropies: bool = False, return_node_instances: bool = False, reference_graph: Optional[nx.DiGraph] = None) -> float:
     """
     This is a tool that computes the entropy of a causal network given a set of observations. The entropy of a causal network is the joint entropy of all its variables.
     It is obtained by computing the sum of the conditional entropies of each node in the graph given its parents (and standard entropy of the root nodes).
@@ -113,11 +118,17 @@ def observation_constrained_causal_graph_entropy(inference_graph_instantiations:
         observations: A dictionary of observed values for the variables in the causal network. This is used to condition the entropy calculation.
         return_individual_entropies: If True, the function will return a list of individual entropies for each node in the graph.
         return_node_instances: If True, the function will return a dictionary of node instances for each node in the graph.
+        reference_graph: A reference graph to use for the entropy calculation. If None, the first graph in inference_graph_instantiations is used as the reference graph.
+                         This argument should be provided if the inference_graph_instantiations do not all have the same structure.
     Returns:
-        The entropy of the causal network. If return_individual_entropies is True, a tuple is returned with the global entropy and a dictionary of individual entropies for each node in the graph.
+        The entropy of the causal network. If return_individual_entropies is True, a tuple is returned with a dictionary of individual entropies for each node in the graph.
+        If return_node_instances is True, a tuple is returned with a dictionary of node instances for each node in the graph.
     """
     accepted_node_values = {node: [value] for node, value in observations.items()}
-    reference_graph = inference_graph_instantiations[0]
+
+    if reference_graph is None:
+        reference_graph = inference_graph_instantiations[0]
+    
     entropies = {}
     def _compute_entropy_rec(node: str) -> None:
         if node in accepted_node_values: # if the node is already observed, we can skip it
@@ -125,7 +136,7 @@ def observation_constrained_causal_graph_entropy(inference_graph_instantiations:
 
         else:
             parents = list(reference_graph.predecessors(node))
-            instantiations = [graph.nodes[node] for graph in inference_graph_instantiations]
+            instantiations = [graph.nodes[node] for graph in inference_graph_instantiations if node in graph.nodes]
             if not parents:
                 accepted_node_values[node] = instantiations
                 entropies[node] = causal_variable_entropy(instantiations)
@@ -137,19 +148,26 @@ def observation_constrained_causal_graph_entropy(inference_graph_instantiations:
                 parent_instantiations = {parent: [None] * len(inference_graph_instantiations) for parent in parents}
                 for i, graph in enumerate(inference_graph_instantiations):
                     for parent in parents:
-                        if graph.nodes[parent] not in accepted_node_values[parent]:
-                            for p in parents:
-                                parent_instantiations[p][i] = None
-                            break
+                        if parent in graph.nodes:
+                            if graph.nodes[parent] not in accepted_node_values[parent]:
+                                for p in parents:
+                                    parent_instantiations[p][i] = None
+                                break
+                            else:
+                                parent_instantiations[parent][i] = graph.nodes[parent]
                         else:
-                            parent_instantiations[parent][i] = graph.nodes[parent]
+                            parent_instantiations[parent][i] = "MISSING"
                 
                 for i in range(len(instantiations)-1, -1, -1):
                     parent_idx_ref = list(parent_instantiations.keys())[0]
-                    if parent_instantiations[parent_idx_ref][i] is None:
+                    if parent_instantiations[parent_idx_ref][i] is None: # if at least one parent does not have an accepted value, the instantiation is not reachable and is removed
                         for parent in parents:
                             parent_instantiations[parent].pop(i)
                         instantiations.pop(i)
+                    else:
+                        for parent in parents:
+                            if parent_instantiations[parent][i] == "MISSING": # if a parent does not have a value, it is removed fromthe conditioning set
+                                parent_instantiations[parent].pop(i)
 
                 accepted_node_values[node] = instantiations
                 entropies[node] = causal_variable_conditional_entropy(instantiations, parent_instantiations)
