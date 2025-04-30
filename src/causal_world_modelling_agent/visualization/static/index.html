@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Causal Graph Visualizer</title>
+    
+    <!-- Load vis.js library for graph visualization -->
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    
+    <!-- Custom stylesheet with absolute path -->
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <h1>Causal Graph Visualizer</h1>
+            <div class="controls">
+                <div class="file-input-container">
+                    <label for="graph-file" class="button">Open Graph File</label>
+                    <input type="file" id="graph-file" accept=".gml,.graphml,.gexf,.json">
+                    <span id="file-name">No file selected</span>
+                </div>
+                <div class="button-group">
+                    <button id="zoom-in" title="Zoom In">+</button>
+                    <button id="zoom-out" title="Zoom Out">-</button>
+                    <button id="zoom-fit" title="Fit Graph">⤢</button>
+                    <button id="toggle-physics" title="Toggle Physics">⚛</button>
+                </div>
+            </div>
+            
+            <!-- World attribute search panel -->
+            <div class="search-panel">
+                <div class="search-controls">
+                    <label for="world-key-select">World:</label>
+                    <select id="world-key-select" disabled>
+                        <option value="">Select a world_i...</option>
+                    </select>
+                    
+                    <button id="clear-search-btn" class="button button-secondary" disabled>Reset</button>
+                </div>
+                <div id="search-results" class="hidden">
+                    <span id="results-count">0</span> nodes found with matching world
+                </div>
+            </div>
+        </header>
+        
+        <main>
+            <div id="loading" class="loading-overlay hidden">
+                <div class="loading-spinner"></div>
+                <p>Loading graph...</p>
+            </div>
+            
+            <!-- Legend for clusters -->
+            <div id="cluster-legend" class="legend hidden">
+                <h4>Cluster Legend</h4>
+                <div id="cluster-legend-items"></div>
+            </div>
+            
+            <div class="visualization-container">
+                <div id="graph-container"></div>
+                <div id="info-panel" class="hidden">
+                    <div class="info-header">
+                        <h3 id="info-title">Node/Edge Information</h3>
+                        <button id="close-info" title="Close">×</button>
+                    </div>
+                    <div class="info-content">
+                        <div id="attributes-container"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <footer>
+            <p>Graph Statistics: <span id="graph-stats">No graph loaded</span></p>
+            <button id="toggle-legend" class="button-link">Toggle Cluster Legend</button>
+        </footer>
+    </div>
+    
+    <!-- Custom script for graph handling with absolute path -->
+    <script src="/script.js"></script>
+</body>
+</html>
