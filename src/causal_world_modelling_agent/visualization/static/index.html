@@ -8,6 +8,9 @@
     <!-- Load vis.js library for graph visualization -->
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     
+    <!-- Chart.js for visualizing metrics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
     <!-- Custom stylesheet with absolute path -->
     <link rel="stylesheet" href="/styles.css">
 </head>
@@ -26,6 +29,7 @@
                     <button id="zoom-out" title="Zoom Out">-</button>
                     <button id="zoom-fit" title="Fit Graph">⤢</button>
                     <button id="toggle-physics" title="Toggle Physics">⚛</button>
+                    <button id="toggle-analysis" title="Toggle Graph Analysis" class="button-secondary">📊 Analysis</button>
                 </div>
             </div>
             
@@ -66,6 +70,39 @@
                     </div>
                     <div class="info-content">
                         <div id="attributes-container"></div>
+                    </div>
+                </div>
+                
+                <!-- Analysis Panel -->
+                <div id="analysis-panel" class="analysis-panel">
+                    <div class="analysis-header">
+                        <h3>Graph Analysis</h3>
+                        <button id="close-analysis" title="Close">×</button>
+                    </div>
+                    <div class="analysis-tabs">
+                        <button class="tab-button active" data-tab="structural">Structural</button>
+                        <button class="tab-button" data-tab="causal">Causal</button>
+                        <button class="tab-button" data-tab="community">Communities</button>
+                        <button class="tab-button" data-tab="topic">Topic Clusters</button>
+                    </div>
+                    <div class="analysis-content">
+                        <!-- Tab content will be dynamically populated -->
+                        <div class="tab-content active" id="structural-tab">
+                            <button id="analyze-structural" class="analyze-button">Analyze Structural Properties</button>
+                            <div id="structural-results" class="analysis-results"></div>
+                        </div>
+                        <div class="tab-content" id="causal-tab">
+                            <button id="analyze-causal" class="analyze-button">Analyze Causal Properties</button>
+                            <div id="causal-results" class="analysis-results"></div>
+                        </div>
+                        <div class="tab-content" id="community-tab">
+                            <button id="analyze-community" class="analyze-button">Analyze Community Structure</button>
+                            <div id="community-results" class="analysis-results"></div>
+                        </div>
+                        <div class="tab-content" id="topic-tab">
+                            <button id="analyze-topic" class="analyze-button">Analyze Topic Clusters</button>
+                            <div id="topic-results" class="analysis-results"></div>
+                        </div>
                     </div>
                 </div>
             </div>
