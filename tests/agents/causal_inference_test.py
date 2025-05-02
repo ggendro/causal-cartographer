@@ -457,7 +457,6 @@ class TestCausalInferenceAgent:
         assert answer_graph.nodes['C']['causal_effect'] == 1
 
     def test_run_with_features_and_checks(self, causal_inference_agent_with_checks, causal_graph_full_features):
-        print(causal_graph_full_features.nodes(data=True))
         answer_text, answer_graph = causal_inference_agent_with_checks.run("Hello world!", 
                                                                            additional_args={
                                                                                'causal_graph': causal_graph_full_features, 
