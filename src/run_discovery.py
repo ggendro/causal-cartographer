@@ -60,6 +60,7 @@ def display_plot(causal_graph: nx.Graph, save_path: str = None) -> None:
     # Plot or save graph
     if save_path:
         current_time = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        os.makedirs(save_path, exist_ok=True)
         nx.write_gml(causal_graph, os.path.join(save_path, f"causal_graph_{current_time}.gml"), stringizer=str)
         plt.savefig(os.path.join(save_path, f"causal_graph_{current_time}.png"), bbox_inches='tight')
     else:

@@ -95,12 +95,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model_base", type=str, default="o3-mini-2025-01-31", help="Base model to use.")
     parser.add_argument("--api_key", type=str, required=True, help="API key for the model.")
     parser.add_argument("--prompt_complement", type=str, default="Compute the causal effect from the variables as required.", help="Prompt complement to help the model.") 
-    parser.add_argument("--save_path", type=str, default="../../data/inference", help="Path to save the inference results.")
+    parser.add_argument("--save_path", type=str, default="../data/inference", help="Path to save the inference results.")
     parser.add_argument("--dataset_save_path", type=str, default=None, help="Path to save the dataset.")
     parser.add_argument("--max_interventions", type=int, default=3, help="Maximum number of interventions to consider.")
     parser.add_argument("--mixing_functions", type=str, default="all", help="Mixing functions to use for counterfactuals.")
     parser.add_argument("--resume", type=str, default=None, help="Path to resume the graph from a GML file.")
-    parser.add_argument('--max_queries', type=int, default=None, help='Maximum number of documents to process.')
+    parser.add_argument('--max_queries', type=int, default=None, help='Maximum number of queries to execute.')
     parser.add_argument('--allow_balancing', action='store_true', help='Allow balancing the dataset by randomly selecting queries during generation (works only with graph_path).')
     parser.add_argument('--seed', type=int, default=42, help='Random seed for reproducibility.')
     parser.add_argument('--build_dataset_only', action='store_true', help='Only build the dataset without running the evaluation. dataset_save_path must be specified.')
@@ -203,11 +203,13 @@ def main(model_base: str,
     # Save results to CSV
     current_time = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     if not build_dataset_only:
+        os.makedirs(save_path, exist_ok=True)
         results.to_csv(os.path.join(save_path, f"evaluation_results_{current_time}.csv"), index=False)
 
     if dataset_save_path:
         dataset_save["observations"] = dataset_save["observations"].apply(lambda x: json.dumps(x)) # Convert to JSON string
         dataset_save["interventions"] = dataset_save["interventions"].apply(lambda x: json.dumps(x))
+        os.makedirs(dataset_save_path, exist_ok=True)
         dataset_save.to_csv(os.path.join(dataset_save_path, f"dataset_{current_time}.csv"), index=False)
         os.rename(os.path.join(dataset_save_path, "graphs_temp"), os.path.join(dataset_save_path, f"dataset_{current_time}_graphs"))
 
