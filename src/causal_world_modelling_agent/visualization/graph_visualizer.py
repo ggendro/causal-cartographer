@@ -602,12 +602,12 @@ class GraphVisualizer:
             
             # Determine the optimal number of clusters using silhouette score
             # Try different cluster counts to find best separation
-            max_clusters = min(20, len(node_text) - 1)  # Don't try more clusters than we have nodes - 1
+            max_clusters = min(50, len(node_text) - 1)  # Don't try more clusters than we have nodes - 1
             best_score = -1
-            best_k = 2  # Default to 2 clusters if we can't find better
+            best_k = 10  # Default to 10 clusters if we can't find better
             
             if len(node_text) > 10:  # Only worth trying multiple k values if we have enough data
-                for k in range(2, min(max_clusters, 10) + 1):
+                for k in range(2, max_clusters + 1):
                     kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
                     cluster_labels = kmeans.fit_predict(embeddings)
                     
