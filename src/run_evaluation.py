@@ -82,7 +82,8 @@ def evaluate_query(query: Dict[str, str], inference_agent: CausalInferenceAgentF
     return {
         **query_copy,
         "causal_effect": causal_effect,
-        "computation_graph": causal_graph,
+        "computation_graph": json.dumps(causal_graph.nodes(data=True)),
+        "predicted_value": causal_graph.nodes[query["target_variable"]]["current_value"],
         "correct": is_correct
     }
 
@@ -147,7 +148,7 @@ def main(model_base: str,
         skip_rows = len(results)
         print(f"Resuming from {resume}. {skip_rows} rows already processed.")
     else:
-        results = pd.DataFrame(columns=list(Query.__annotations__.keys()) + ["type", "causal_effect", "computation_graph", "correct", "error"])
+        results = pd.DataFrame(columns=list(Query.__annotations__.keys()) + ["type", "causal_effect", "predicted_value", "computation_graph", "correct", "error"])
         skip_rows = 0
 
     if dataset_save_path:
@@ -192,6 +193,7 @@ def main(model_base: str,
                     **query,
                     "causal_effect": None,
                     "computation_graph": None,
+                    "predicted_value": None,
                     "correct": False,
                     "type": query_type,
                     "error": str(e)
