@@ -1,7 +1,6 @@
 import os
 import argparse
 import networkx as nx
-import matplotlib.pyplot as plt
 import pandas as pd
 import datetime
 import tqdm
@@ -9,7 +8,7 @@ from typing import Generator, Tuple, Optional, List, Dict
 import random
 import json
 
-from smolagents import LiteLLMModel
+from smolagents import LiteLLMModel, TransformersModel
 
 from causal_world_modelling_agent.agents.causal_inference.causal_inference_agent import CausalInferenceAgentFactory
 from causal_world_modelling_agent.world_model.world_manager import BaseWorldManager, Query, MIXING_FUNCTIONS
@@ -94,7 +93,8 @@ def parse_args() -> argparse.Namespace:
     source_group.add_argument("--graph_path", type=str, help="Path to the graph file.")
     source_group.add_argument("--dataset_path", type=str, help="Path to the dataset file.")
     parser.add_argument("--model_base", type=str, default="o3-mini-2025-01-31", help="Base model to use.")
-    parser.add_argument("--api_key", type=str, required=True, help="API key for the model.")
+    parser.add_argument("--api_key", type=str, help="API key for the model.")
+    parser.add_argument("--model_type", type=str, choices=["lite", "transformers"], default="lite", help="Type of model to use.")
     parser.add_argument("--prompt_complement", type=str, default="Compute the causal effect from the variables as required.", help="Prompt complement to help the model.") 
     parser.add_argument("--save_path", type=str, default="../data/inference", help="Path to save the inference results.")
     parser.add_argument("--dataset_save_path", type=str, default=None, help="Path to save the dataset.")
@@ -110,6 +110,7 @@ def parse_args() -> argparse.Namespace:
 
 def main(model_base: str, 
          api_key: str,
+         model_type: str,
          prompt_complement: str,
          save_path: str, 
          dataset_save_path: str, 
@@ -139,7 +140,16 @@ def main(model_base: str,
     else:
         raise ValueError("Either graph_path or dataset_path must be provided.")
 
-    base_model = LiteLLMModel(model_id=model_base, api_key=api_key)
+    # Load the model
+    if model_type == "lite":
+        base_model = LiteLLMModel(model_id=model_base, api_key=api_key)
+    elif model_type == "transformers":
+        import torch
+        base_model = TransformersModel(model_id=model_base, device_map="cuda:0" if torch.cuda.is_available() else "cpu", max_new_tokens=4000)
+    else:
+        raise ValueError("Invalid model type. Choose either 'lite' or 'transformers'.")
+    
+    # Create the inference agent
     inference_agent = CausalInferenceAgentFactory().createAgent(base_model)
 
     # Evaluate on observations and counterfactuals

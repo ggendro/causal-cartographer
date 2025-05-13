@@ -71,7 +71,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Discover causal structure from data.")
     parser.add_argument("--data_dir", type=str, default="../data/data", help="Directory containing JSON files to load.")
     parser.add_argument("--model_base", type=str, default="o3-mini-2025-01-31", help="Base model to use.")
-    parser.add_argument("--api_key", type=str, required=True, help="API key for the LLM model.")
+    parser.add_argument("--api_key", type=str, help="API key for the LLM model.")
     parser.add_argument("--save_path", type=str, default="../data/world_graphs", help="Path to save the graph plot.")
     parser.add_argument("--resume", type=str, default=None, help="Path to resume the graph from a GML file.")
     parser.add_argument('--max_docs', type=int, default=None, help='Maximum number of documents to process.')
