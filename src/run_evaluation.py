@@ -11,6 +11,7 @@ import json
 from smolagents import LiteLLMModel, TransformersModel
 
 from causal_world_modelling_agent.agents.causal_inference.causal_inference_agent import CausalInferenceAgentFactory
+from causal_world_modelling_agent.agents.causal_inference.cot_agent import CausalCoTAgentFactory
 from causal_world_modelling_agent.world_model.world_manager import BaseWorldManager, Query, MIXING_FUNCTIONS
 
 
@@ -95,6 +96,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model_base", type=str, default="o3-mini-2025-01-31", help="Base model to use.")
     parser.add_argument("--api_key", type=str, help="API key for the model.")
     parser.add_argument("--model_type", type=str, choices=["lite", "transformers"], default="lite", help="Type of model to use.")
+    parser.add_argument("--agent_type", type=str, choices=["cot", "causal"], default="causal", help="Type of agent to use.")
     parser.add_argument("--prompt_complement", type=str, default="Compute the causal effect from the variables as required.", help="Prompt complement to help the model.") 
     parser.add_argument("--save_path", type=str, default="../data/inference", help="Path to save the inference results.")
     parser.add_argument("--dataset_save_path", type=str, default=None, help="Path to save the dataset.")
@@ -111,6 +113,7 @@ def parse_args() -> argparse.Namespace:
 def main(model_base: str, 
          api_key: str,
          model_type: str,
+         agent_type: str,
          prompt_complement: str,
          save_path: str, 
          dataset_save_path: str, 
@@ -150,7 +153,12 @@ def main(model_base: str,
         raise ValueError("Invalid model type. Choose either 'lite' or 'transformers'.")
     
     # Create the inference agent
-    inference_agent = CausalInferenceAgentFactory().createAgent(base_model)
+    if agent_type == "cot":
+        inference_agent = CausalCoTAgentFactory().createAgent(base_model)
+    elif agent_type == "causal":
+        inference_agent = CausalInferenceAgentFactory().createAgent(base_model)
+    else:
+        raise ValueError("Invalid agent type. Choose either 'cot' or 'causal'.")
 
     # Evaluate on observations and counterfactuals
     if resume:
