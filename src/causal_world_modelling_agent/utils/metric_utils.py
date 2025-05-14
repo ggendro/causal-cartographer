@@ -1009,105 +1009,6 @@ class LLMOutputEvaluator:
         
         return None
     
-    def _create_bar_plot(self, data, x_labels, y_values, y_errors=None, title="", x_label="", y_label="", 
-                       output_path=None, show_plot=False, figsize=(10, 6), rotation=0):
-        """Helper method to create bar plots with error bars."""
-        plt.figure(figsize=figsize)
-        
-        # Create bars
-        bars = plt.bar(x_labels, y_values, yerr=y_errors, capsize=5, color=sns.color_palette('viridis', len(x_labels)))
-        
-        # Add value labels on top of bars
-        for bar, val in zip(bars, y_values):
-            height = bar.get_height()
-            plt.text(bar.get_x() + bar.get_width()/2., height + (0.05 * max(y_values) if max(y_values) > 0 else 0.05),
-                    f'{val:.2f}', ha='center', va='bottom')
-        
-        plt.title(title, fontsize=15)
-        plt.xlabel(x_label, fontsize=12)
-        plt.ylabel(y_label, fontsize=12)
-        plt.xticks(rotation=rotation)
-        plt.tight_layout()
-        
-        # Save and show plot
-        if output_path:
-            plt.savefig(output_path, dpi=300)
-        
-        if show_plot:
-            plt.show()
-        else:
-            plt.close()
-            
-        return output_path
-            
-    def _create_violin_plot(self, data, column, by=None, title="", x_label="", y_label="", 
-                           output_path=None, show_plot=False, figsize=(10, 6), y_lim=None, clip=None):
-        """Helper method to create violin plots."""
-        plt.figure(figsize=figsize)
-        
-        # Prepare data - clip extreme values if needed
-        if clip is not None and clip[0] is not None and clip[1] is not None:
-            plot_data = data.copy()
-            plot_data[column] = plot_data[column].clip(*clip)
-        else:
-            plot_data = data
-            
-        # Create violin plot
-        if by is not None:
-            sns.violinplot(data=plot_data, x=by, y=column)
-        else:
-            sns.violinplot(data=plot_data, y=column)
-            
-        plt.title(title, fontsize=15)
-        plt.xlabel(x_label, fontsize=12)
-        plt.ylabel(y_label, fontsize=12)
-        
-        # Set y limits if provided
-        if y_lim:
-            plt.ylim(y_lim)
-            
-        plt.tight_layout()
-        
-        # Save and show plot
-        if output_path:
-            plt.savefig(output_path, dpi=300)
-        
-        if show_plot:
-            plt.show()
-        else:
-            plt.close()
-            
-        return output_path
-    
-    def _create_confusion_matrix(self, true_values, pred_values, labels, title="", 
-                                output_path=None, show_plot=False, figsize=(8, 6)):
-        """Helper method to create confusion matrices."""
-        
-        plt.figure(figsize=figsize)
-        
-        # Create confusion matrix
-        cm = confusion_matrix(true_values, pred_values, labels=labels)
-        cm_norm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
-        
-        # Plot
-        sns.heatmap(cm_norm, annot=True, fmt='.2f', cmap='viridis',
-                   xticklabels=labels, yticklabels=labels)
-        
-        plt.title(title, fontsize=15)
-        plt.xlabel('Predicted', fontsize=12)
-        plt.ylabel('True', fontsize=12)
-        plt.tight_layout()
-        
-        # Save and show plot
-        if output_path:
-            plt.savefig(output_path, dpi=300)
-        
-        if show_plot:
-            plt.show()
-        else:
-            plt.close()
-            
-        return output_path
     
     def _create_subplot_figure(self, n_rows, n_cols, figsize=(12, 10)):
         """Helper method to create a figure with subplots.
@@ -1161,7 +1062,7 @@ class LLMOutputEvaluator:
             # Plot 2: Relative Error
             plot_data['clipped_relative_error'] = plot_data['numerical_relative_error'].clip(0, 2)  # Clip at 200% error
             
-            sns.violinplot(data=plot_data, y='clipped_relative_error', ax=axes[1])
+            sns.violinplot(data=plot_data, y='clipped_relative_error', ax=axes[1], cut=0)
             axes[1].set_title('Distribution of Relative Error', fontsize=15)
             axes[1].set_ylabel('Relative Error (clipped at 2.0)', fontsize=12)
             
@@ -1199,7 +1100,7 @@ class LLMOutputEvaluator:
                 # Plot 2: Relative Error by Query Type
                 plot_data['clipped_relative_error'] = plot_data['numerical_relative_error'].clip(0, 2)
                 
-                sns.violinplot(data=plot_data, x='query_type', y='clipped_relative_error', ax=axes[1])
+                sns.violinplot(data=plot_data, x='query_type', y='clipped_relative_error', ax=axes[1], cut=0)
                 axes[1].set_title('Relative Error by Query Type', fontsize=15)
                 axes[1].set_xlabel('Query Type', fontsize=12)
                 axes[1].set_ylabel('Relative Error (clipped at 2.0)', fontsize=12)
@@ -1831,7 +1732,7 @@ class LLMOutputEvaluator:
                         plot_data = valid_data.copy()
                         plot_data['clipped_error'] = plot_data[col].clip(0, clip_val)
                         
-                        sns.violinplot(data=plot_data, y='clipped_error', ax=axes[1, 1])
+                        sns.violinplot(data=plot_data, y='clipped_error', ax=axes[1, 1], cut=0)
                         axes[1, 1].set_title('Distribution of Change Percent Error', fontsize=15)
                         axes[1, 1].set_ylabel('Error (clipped)', fontsize=12)
         
