@@ -147,8 +147,7 @@ def main(model_base: str,
     if model_type == "lite":
         base_model = LiteLLMModel(model_id=model_base, api_key=api_key)
     elif model_type == "transformers":
-        import torch
-        base_model = TransformersModel(model_id=model_base, device_map="cuda:0" if torch.cuda.is_available() else "cpu", max_new_tokens=4000)
+        base_model = TransformersModel(model_id=model_base, device_map="auto", max_new_tokens=4000)
     else:
         raise ValueError("Invalid model type. Choose either 'lite' or 'transformers'.")
     
@@ -225,6 +224,7 @@ def main(model_base: str,
     if not build_dataset_only:
         os.makedirs(save_path, exist_ok=True)
         results.to_csv(os.path.join(save_path, f"evaluation_results_{current_time}.csv"), index=False)
+        print(f"Results from agent {agent_type} with model {model_base} saved to {os.path.join(save_path, f'evaluation_results_{current_time}.csv')}")
 
     if dataset_save_path:
         dataset_save["observations"] = dataset_save["observations"].apply(lambda x: json.dumps(x)) # Convert to JSON string
@@ -232,6 +232,7 @@ def main(model_base: str,
         os.makedirs(dataset_save_path, exist_ok=True)
         dataset_save.to_csv(os.path.join(dataset_save_path, f"dataset_{current_time}.csv"), index=False)
         os.rename(os.path.join(dataset_save_path, "graphs_temp"), os.path.join(dataset_save_path, f"dataset_{current_time}_graphs"))
+        print(f"Dataset saved to {os.path.join(dataset_save_path, f'dataset_{current_time}.csv')}")
 
 
 
