@@ -83,7 +83,7 @@ def evaluate_query(query: Dict[str, str], inference_agent: CausalInferenceAgentF
         **query_copy,
         "causal_effect": causal_effect,
         "computation_graph": json.dumps(list(causal_graph.nodes(data=True))),
-        "predicted_value": causal_graph.nodes[query["target_variable"]]["current_value"],
+        "predicted_value": causal_graph.nodes[query_copy["target_variable"]]["current_value"],
         "correct": is_correct
     }
 
