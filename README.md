@@ -1,12 +1,18 @@
-# A Causal World Modelling Agent
+# Causal Cartographer: From Mapping to Reasoning Over Counterfactual Worlds
 
 
-<img src="assets/dialog-example.png" alt="Example of Agent Dialog" width="1200"/>
+<img src="assets/cartographer-pipeline.png" alt="Cartographer Pipeline" width="1200"/>
 
 
 ## Introduction
 
-Repository for the Causal World Modelling Agent project. This framework is an LLM-based approach for the extraction of causal graphs from natural language text and composition of causal world models. The approach builds a causal model and verifies its consistency across counterfactual scenarios built from multiples sources.
+Repository for the Causal Cartographer project. This framework is a twofold LLM-based approach for causal extraction and counterfactual inference.
+
+(1) Extraction agents can extract causal knowledge from natural language text and compose causal world models.
+
+(2) The built causal world models allow the creation of counterfactual scenarios based on the extracted causal knowledge.
+
+(3) Reasoning agents perform counterfactual causal inference on natural language followin causal constraints.
 
 
 ## Installation
@@ -94,12 +100,14 @@ python src/visualize_graph.py --port 8080
 
 | Agent Name | Description | Standalone | Component | Dependencies | Implementation |
 |------------|-------------|------------|-----------|--------------|----------------|
+| **Causal Discovery Agents** |  |  |  |  |  |
 | `atomic_discovery_agent` | Agent that builds a simple networkx causal graph from a text snippet using pre-trained commonsense knowledge. | :white_check_mark: | :white_check_mark: | `networkx` | :white_check_mark: |
 | `atomic_rag_agent` | Agent that extracts causal graphs using retrieval augmented generation (RAG) for improved contextual understanding. | :white_check_mark: | :white_check_mark: | `networkx` | :white_check_mark: |
 | `self_iterative_agent` | Agent that recursively builds a networkx causal graph from a text snippet or a topic. Stops after a predefined number of steps. | :white_check_mark: | :white_check_mark: | `networkx` | :white_check_mark: |
-| `causal_inference_agent` | Agent that performs counterfactual causal inference on a networkx causal graph using an LLM as an inference engine. | :white_check_mark: | :white_check_mark: | | :white_check_mark: |
-| `backward_inference_agent` | Agent that performs backward causal reasoning from effects to potential causes. | :white_check_mark: | :white_check_mark: | | :white_check_mark: |
-| `counterfactual_text_generation_agent` | Agent that generates counterfactual scenarios based on causal graphs. | :white_check_mark: | :white_check_mark: | | :white_check_mark: |
+| **Causal Inference Agents** |  |  |  |  |  |
+| `causal_inference_agent` | Agent that performs counterfactual causal inference on a networkx causal graph using an LLM as an inference engine. | :white_check_mark: | :white_check_mark: | `networkx` | :white_check_mark: |
+| `backward_inference_agent` | Agent that performs backward causal reasoning from effects to potential causes. | :white_check_mark: | :white_check_mark: | `networkx` | :white_check_mark: |
+| `cot_agent` | Agent that performs causal inference using chain-of-thought reasoning for more transparent decision making. | :white_check_mark: | :white_check_mark: | | :white_check_mark: |
 
 
 ## License
