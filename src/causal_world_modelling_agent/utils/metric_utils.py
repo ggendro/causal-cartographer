@@ -488,7 +488,7 @@ class LLMOutputEvaluator:
                 true_direction = "neutral"
                 
             # Get directional evaluation of the output
-            directional_result = self.evaluate_directional(llm_output, true_direction)
+            directional_result = self.evaluate_directional(llm_output, "null")
             output_direction = directional_result["directional_output_direction"]
             direction_match = output_direction == true_direction if output_direction is not None else False
             
